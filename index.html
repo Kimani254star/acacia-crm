@@ -105,7 +105,16 @@ background:#2563eb;
 .main{
 margin-left:250px;
 min-height:100vh;
+transition:margin-left .3s;
 }
+
+.sidebar.collapsed{transform:translateX(-250px);}
+.sidebar.collapsed + .main,.main.full{margin-left:0;}
+
+.page-section[hidden]{display:none;}
+.placeholder-page{background:#fff;border-radius:14px;padding:60px 30px;margin:20px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05);}
+.placeholder-page h2{font-size:32px;color:#062b69;margin-bottom:12px;}
+.placeholder-page p{color:#6b7280;font-size:15px;}
 
 .header{
 position:sticky;
@@ -436,26 +445,26 @@ color:#6b7280;
 
 <ul>
 
-<li><a href="#" class="active">🏠 Dashboard</a></li>
-<li><a href="#">👥 Customers</a></li>
-<li><a href="#">🧲 Leads</a></li>
-<li><a href="#">💼 Opportunities</a></li>
-<li><a href="#">🏢 Companies</a></li>
-<li><a href="#">📞 Contacts</a></li>
-<li><a href="#">📋 Quotations</a></li>
-<li><a href="#">📑 Contracts</a></li>
-<li><a href="#">📅 Calendar</a></li>
-<li><a href="#">📞 Calls</a></li>
-<li><a href="#">🤝 Meetings</a></li>
-<li><a href="#">✅ Tasks</a></li>
-<li><a href="#">📧 Email</a></li>
-<li><a href="#">📂 Documents</a></li>
-<li><a href="#">📊 Reports</a></li>
-<li><a href="#">🤖 AI Insights</a></li>
-<li><a href="#">⚙ Settings</a></li>
-<li><a href="#">🔔 Notifications</a></li>
-<li><a href="#">🔒 Audit Trail</a></li>
-<li><a href="#">❓ Help</a></li>
+<li><a href="#" class="nav-link active" data-page="dashboard">🏠 Dashboard</a></li>
+<li><a href="#" class="nav-link" data-page="customers">👥 Customers</a></li>
+<li><a href="#" class="nav-link" data-page="leads">🧲 Leads</a></li>
+<li><a href="#" class="nav-link" data-page="opportunities">💼 Opportunities</a></li>
+<li><a href="#" class="nav-link" data-page="companies">🏢 Companies</a></li>
+<li><a href="#" class="nav-link" data-page="contacts">📞 Contacts</a></li>
+<li><a href="#" class="nav-link" data-page="quotations">📋 Quotations</a></li>
+<li><a href="#" class="nav-link" data-page="contracts">📑 Contracts</a></li>
+<li><a href="#" class="nav-link" data-page="calendar">📅 Calendar</a></li>
+<li><a href="#" class="nav-link" data-page="calls">📞 Calls</a></li>
+<li><a href="#" class="nav-link" data-page="meetings">🤝 Meetings</a></li>
+<li><a href="#" class="nav-link" data-page="tasks">✅ Tasks</a></li>
+<li><a href="#" class="nav-link" data-page="email">📧 Email</a></li>
+<li><a href="#" class="nav-link" data-page="documents">📂 Documents</a></li>
+<li><a href="#" class="nav-link" data-page="reports">📊 Reports</a></li>
+<li><a href="#" class="nav-link" data-page="ai-insights">🤖 AI Insights</a></li>
+<li><a href="#" class="nav-link" data-page="settings">⚙ Settings</a></li>
+<li><a href="#" class="nav-link" data-page="notifications">🔔 Notifications</a></li>
+<li><a href="#" class="nav-link" data-page="audit-trail">🔒 Audit Trail</a></li>
+<li><a href="#" class="nav-link" data-page="help">❓ Help</a></li>
 
 </ul>
 
@@ -496,6 +505,7 @@ color:#6b7280;
 </div>
 
 <div class="content">
+<section class="page-section" data-page="dashboard">
 
 <div class="cards">
 
@@ -1139,6 +1149,28 @@ Performance Report
 <div id="recentActivities">
 
 </div>
+
+</section>
+
+<section class="page-section" data-page="customers" hidden><div class="placeholder-page"><h2>👥 Customers</h2><p>This module is coming soon.</p></div></section>
+<section class="page-section" data-page="leads" hidden><div class="placeholder-page"><h2>🧲 Leads</h2><p>This module is coming soon.</p></div></section>
+<section class="page-section" data-page="opportunities" hidden><div class="placeholder-page"><h2>💼 Opportunities</h2><p>This module is coming soon.</p></div></section>
+<section class="page-section" data-page="companies" hidden><div class="placeholder-page"><h2>🏢 Companies</h2><p>This module is coming soon.</p></div></section>
+<section class="page-section" data-page="contacts" hidden><div class="placeholder-page"><h2>📞 Contacts</h2><p>This module is coming soon.</p></div></section>
+<section class="page-section" data-page="quotations" hidden><div class="placeholder-page"><h2>📋 Quotations</h2><p>This module is coming soon.</p></div></section>
+<section class="page-section" data-page="contracts" hidden><div class="placeholder-page"><h2>📑 Contracts</h2><p>This module is coming soon.</p></div></section>
+<section class="page-section" data-page="calendar" hidden><div class="placeholder-page"><h2>📅 Calendar</h2><p>This module is coming soon.</p></div></section>
+<section class="page-section" data-page="calls" hidden><div class="placeholder-page"><h2>📞 Calls</h2><p>This module is coming soon.</p></div></section>
+<section class="page-section" data-page="meetings" hidden><div class="placeholder-page"><h2>🤝 Meetings</h2><p>This module is coming soon.</p></div></section>
+<section class="page-section" data-page="tasks" hidden><div class="placeholder-page"><h2>✅ Tasks</h2><p>This module is coming soon.</p></div></section>
+<section class="page-section" data-page="email" hidden><div class="placeholder-page"><h2>📧 Email</h2><p>This module is coming soon.</p></div></section>
+<section class="page-section" data-page="documents" hidden><div class="placeholder-page"><h2>📂 Documents</h2><p>This module is coming soon.</p></div></section>
+<section class="page-section" data-page="reports" hidden><div class="placeholder-page"><h2>📊 Reports</h2><p>This module is coming soon.</p></div></section>
+<section class="page-section" data-page="ai-insights" hidden><div class="placeholder-page"><h2>🤖 AI Insights</h2><p>This module is coming soon.</p></div></section>
+<section class="page-section" data-page="settings" hidden><div class="placeholder-page"><h2>⚙ Settings</h2><p>This module is coming soon.</p></div></section>
+<section class="page-section" data-page="notifications" hidden><div class="placeholder-page"><h2>🔔 Notifications</h2><p>This module is coming soon.</p></div></section>
+<section class="page-section" data-page="audit-trail" hidden><div class="placeholder-page"><h2>🔒 Audit Trail</h2><p>This module is coming soon.</p></div></section>
+<section class="page-section" data-page="help" hidden><div class="placeholder-page"><h2>❓ Help</h2><p>This module is coming soon.</p></div></section>
 
 </div>
 
@@ -2430,6 +2462,62 @@ window.addEventListener("load",()=>{
 CRM.start();
 
 });
+</script>
+
+<script>
+(function(){
+  const links=document.querySelectorAll('.nav-link');
+  const sections=document.querySelectorAll('.page-section');
+  const titleEl=document.querySelector('.pageTitle h1');
+  const subEl=document.querySelector('.pageTitle p');
+  const titles={
+    dashboard:['🏢 CRM Portal','Customer Relationship Management'],
+    customers:['👥 Customers','Manage your customer base'],
+    leads:['🧲 Leads','Track and convert leads'],
+    opportunities:['💼 Opportunities','Sales pipeline overview'],
+    companies:['🏢 Companies','Company accounts'],
+    contacts:['📞 Contacts','Contact directory'],
+    quotations:['📋 Quotations','Quotes and proposals'],
+    contracts:['📑 Contracts','Contract management'],
+    calendar:['📅 Calendar','Schedule and events'],
+    calls:['📞 Calls','Call logs'],
+    meetings:['🤝 Meetings','Meeting records'],
+    tasks:['✅ Tasks','Task management'],
+    email:['📧 Email','Email communications'],
+    documents:['📂 Documents','Document library'],
+    reports:['📊 Reports','Analytics and reports'],
+    'ai-insights':['🤖 AI Insights','AI-powered insights'],
+    settings:['⚙ Settings','Configuration'],
+    notifications:['🔔 Notifications','All notifications'],
+    'audit-trail':['🔒 Audit Trail','Activity history'],
+    help:['❓ Help','Support and documentation']
+  };
+  function show(page){
+    links.forEach(l=>l.classList.toggle('active',l.dataset.page===page));
+    sections.forEach(s=>s.hidden=s.dataset.page!==page);
+    if(titles[page]){titleEl.textContent=titles[page][0];subEl.textContent=titles[page][1];}
+    window.scrollTo(0,0);
+    if(page==='dashboard' && window.CRM && CRM.start){try{CRM.render&&CRM.render();}catch(e){}}
+    location.hash=page;
+  }
+  links.forEach(link=>{
+    link.addEventListener('click',e=>{
+      e.preventDefault();
+      show(link.dataset.page);
+    });
+  });
+  const menuBtn=document.querySelector('.menuBtn');
+  const sidebar=document.querySelector('.sidebar');
+  const main=document.querySelector('.main');
+  if(menuBtn){
+    menuBtn.addEventListener('click',()=>{
+      sidebar.classList.toggle('collapsed');
+      main.classList.toggle('full');
+    });
+  }
+  const initial=(location.hash||'#dashboard').slice(1);
+  if(titles[initial]) show(initial);
+})();
 </script>
 
 </body>

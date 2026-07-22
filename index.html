@@ -105,6 +105,9 @@
     </div>
 
     <div class="flex items-center gap-2">
+      <button onclick="openAiAssistant()" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white transition-all shadow-sm flex items-center gap-1.5">
+        <span>🤖</span> AI Onboarding Assistant
+      </button>
       <button onclick="openMail()" class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 transition-colors flex items-center gap-1.5">
         <span>✉️</span> Compose Mail
       </button>
@@ -177,6 +180,7 @@
 
     <!-- RIGHT ACTION SIDEBAR -->
     <aside id="rightSidebar" class="w-12 bg-white border-l border-slate-200 p-2 overflow-y-auto shrink-0 flex flex-col items-center space-y-3">
+      <button onclick="openAiAssistant()" title="AI Onboarding & Sync Guide" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg text-base text-purple-600">🤖</button>
       <button onclick="toggleAcaciaNotebook()" title="Quick CRM Notebook" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg text-base relative">
         📔
         <span id="noteBadge" class="hidden absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-600 rounded-full"></span>
@@ -197,6 +201,63 @@
     </aside>
   </div>
 
+  <!-- AI ASSISTANT & LOCAL STORAGE / CLOUD SYNC GUIDE MODAL -->
+  <div id="aiAssistantPanel" class="hidden fixed top-16 right-16 w-[420px] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col z-40 text-xs overflow-hidden h-[560px]">
+    <div class="p-4 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white flex justify-between items-center shrink-0">
+      <div class="flex items-center gap-2.5">
+        <span class="text-xl">🤖</span>
+        <div>
+          <div class="font-bold text-sm">Acacia AI Onboarding Assistant</div>
+          <div class="text-[10px] text-purple-200">Local Storage & Cloud Sync Helper</div>
+        </div>
+      </div>
+      <button onclick="closeAiAssistant()" class="text-purple-300 hover:text-white font-bold text-sm">✕</button>
+    </div>
+
+    <div class="p-3 bg-purple-50/50 border-b border-purple-100 flex items-center justify-between text-[11px]">
+      <span class="font-semibold text-purple-900">New User Guided Setup</span>
+      <button onclick="syncLocalAndCloudData()" class="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded font-bold transition-all shadow-sm">⚡ Sync Now</button>
+    </div>
+
+    <div id="aiAssistantChat" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
+      <!-- AI Intro Message -->
+      <div class="p-3 bg-white border border-purple-100 rounded-xl shadow-sm space-y-2">
+        <div class="font-bold text-purple-900 flex items-center gap-1.5">
+          <span>💡</span> Welcome to Acacia CRM!
+        </div>
+        <p class="text-slate-600 leading-relaxed text-[11px]">
+          I can guide you on how to enter records, save them to your browser's <b>localStorage</b>, and sync them seamlessly with <b>Supabase Cloud</b>.
+        </p>
+      </div>
+
+      <!-- Quick Walkthrough Cards -->
+      <div class="space-y-2">
+        <div class="p-2.5 bg-white border border-slate-200 rounded-lg text-[11px]">
+          <div class="font-bold text-slate-800">1. Local Storage Caching</div>
+          <p class="text-slate-500 mt-0.5">Saves user sessions, offline preferences, and instant fallback data locally on your device.</p>
+        </div>
+        <div class="p-2.5 bg-white border border-slate-200 rounded-lg text-[11px]">
+          <div class="font-bold text-slate-800">2. Supabase Cloud Sync</div>
+          <p class="text-slate-500 mt-0.5">Automatically syncs Leads, Deals, Quotes, Invoices, and Notes across your company workspace.</p>
+        </div>
+      </div>
+
+      <div class="pt-2 text-[10px] text-slate-400 font-bold uppercase tracking-wider">Ask AI Guidance Prompt:</div>
+      <div class="flex flex-wrap gap-1.5">
+        <button onclick="sendAiPrompt('How is my data saved locally?')" class="px-2.5 py-1 bg-white border border-slate-200 hover:border-purple-300 rounded-lg text-[11px] text-slate-700 font-medium">How is data saved locally?</button>
+        <button onclick="sendAiPrompt('How does cloud sync work?')" class="px-2.5 py-1 bg-white border border-slate-200 hover:border-purple-300 rounded-lg text-[11px] text-slate-700 font-medium">How does cloud sync work?</button>
+        <button onclick="sendAiPrompt('How do I back up my CRM data?')" class="px-2.5 py-1 bg-white border border-slate-200 hover:border-purple-300 rounded-lg text-[11px] text-slate-700 font-medium">How do I back up data?</button>
+      </div>
+    </div>
+
+    <!-- Interactive Query Input -->
+    <div class="p-3 bg-white border-t border-slate-200 flex gap-2">
+      <input id="aiAssistantQuery" type="text" placeholder="Ask AI how to save or sync data..." class="flex-1 h-9 px-3 border border-slate-300 rounded-lg outline-none text-xs focus:border-purple-600 bg-slate-50 focus:bg-white"/>
+      <button onclick="submitAiAssistantQuery()" class="px-4 h-9 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-lg text-xs transition-all shadow-sm">Ask</button>
+    </div>
+  </div>
+
+  <!-- 1. EXECUTIVE NOTEBOOK PANEL -->
   <div id="acaciaNotebookPanel" class="hidden fixed top-16 right-16 w-96 bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col z-30 text-xs overflow-hidden h-[540px]">
     <div class="p-3.5 bg-slate-900 text-white font-bold flex justify-between items-center shrink-0">
       <div class="flex items-center gap-2">
@@ -373,6 +434,8 @@ function switchAuthTab(t){
   signupForm.classList.toggle('hidden',s);
 }
 
+function openAiAssistant(){ document.getElementById('aiAssistantPanel')?.classList.remove('hidden'); }
+function closeAiAssistant(){ document.getElementById('aiAssistantPanel')?.classList.add('hidden'); }
 function toggleAcaciaNotebook(){ document.getElementById('acaciaNotebookPanel')?.classList.toggle('hidden'); }
 function toggleWebinarPanel(){ document.getElementById('webinarPanel')?.classList.toggle('hidden'); }
 function toggleCommPanel(){ document.getElementById('commPanel')?.classList.toggle('hidden'); }
@@ -382,6 +445,58 @@ function toggleApps(){ appsMenu.classList.toggle('hidden'); }
 document.addEventListener('click',e=>{
   if(!e.target.closest('#appsMenu')&&!e.target.closest('button[onclick*=toggleApps]')) appsMenu?.classList.add('hidden');
 });
+
+// AI ASSISTANT GUIDANCE LOGIC
+function sendAiPrompt(promptText){
+  const queryInput = document.getElementById('aiAssistantQuery');
+  if(queryInput){
+    queryInput.value = promptText;
+    submitAiAssistantQuery();
+  }
+}
+
+function submitAiAssistantQuery(){
+  const queryInput = document.getElementById('aiAssistantQuery');
+  const chatContainer = document.getElementById('aiAssistantChat');
+  if(!queryInput || !chatContainer) return;
+
+  const userQuery = (queryInput.value || '').trim();
+  if(!userQuery) return;
+
+  // Add User Query Message
+  const userMsg = document.createElement('div');
+  userMsg.className = 'p-2.5 bg-purple-100 text-purple-950 rounded-lg text-[11px] font-medium text-right ml-8';
+  userMsg.textContent = userQuery;
+  chatContainer.appendChild(userMsg);
+
+  queryInput.value = '';
+
+  // Generate AI Response
+  let responseText = '';
+  const q = userQuery.toLowerCase();
+
+  if(q.includes('local') || q.includes('save')){
+    responseText = '<b>Local Data Storage:</b> When you sign in or create workspace users, session info is cached in browser <code>localStorage</code> under keys like <code>acacia_session</code> and <code>users</code>. This allows rapid offline access and instant user recognition.';
+  } else if(q.includes('cloud') || q.includes('sync')){
+    responseText = '<b>Supabase Cloud Sync:</b> When you add or edit records (Leads, Deals, Notes, Memos), data is saved locally and synchronized with Supabase via key-value mappings. Click <b>↻ Sync Cloud</b> at any time to pull fresh updates.';
+  } else if(q.includes('back') || q.includes('export')){
+    responseText = '<b>CRM Data Backup:</b> Go to <b>System Settings</b> ➔ <b>Floating Tools Data Backup & Recovery</b> to download a full JSON export of your notebook, scheduled meetings, and module records.';
+  } else {
+    responseText = '<b>Acacia Guidance:</b> You can create new CRM entries using <b>+ Add Record</b>. Records are saved locally in state and synced automatically with Supabase cloud using your company workspace scope key.';
+  }
+
+  const aiMsg = document.createElement('div');
+  aiMsg.className = 'p-3 bg-white border border-purple-200 rounded-xl shadow-sm text-[11px] text-slate-700 space-y-1.5 mt-2';
+  aiMsg.innerHTML = `<div class="font-bold text-purple-900 flex items-center gap-1"><span>🤖</span> AI Assistant:</div><p>${responseText}</p>`;
+  chatContainer.appendChild(aiMsg);
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+async function syncLocalAndCloudData(){
+  setSync('syncing cloud & local…','busy');
+  await pullAll();
+  alert('Local storage and cloud database synchronized successfully!');
+}
 
 async function fetchUsers(){
   try{
@@ -1066,7 +1181,7 @@ function renderSettingsView(){
         </div>
       </div>
 
-      <!-- NEW FEATURE: FLOATING TOOLS BACKUP & DATA RESTORE MODULE -->
+      <!-- FLOATING TOOLS BACKUP & DATA RESTORE MODULE -->
       <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
         <div class="flex items-center justify-between border-b border-slate-100 pb-2">
           <div>

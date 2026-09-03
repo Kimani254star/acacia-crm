@@ -1,1404 +1,1653 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Acacia CRM — Advanced Enterprise Suite</title>
-<script>
-  window.__SUPA_URL__ = 'https://skatovltmnsuiolduwfr.supabase.co';
-  window.__SUPA_KEY__ = 'sb_publishable_AS3lfXtQELv5CTl8HX6OPQ_8HtYBfQp';
-</script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-  tailwind.config = { theme: { extend: {
-    colors: { acacia: {50:'#eef7ff',100:'#d9ecff',200:'#b6d9ff',300:'#83bfff',400:'#4a9dff',500:'#1f7aef',600:'#0f5fd1',700:'#0d4ca8',800:'#103f85',900:'#12376b'}},
-    fontFamily: { sans: ['Inter','system-ui','sans-serif'] }
-  }}}
-</script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Acacia Books CRM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  html,body{height:100%}
-  body{font-family:'cambria',system-ui,sans-serif;background:#f8fafc}
-  ::-webkit-scrollbar{width:6px;height:6px}
-  ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:6px}
-  .nav-btn.active{background:#0d4ca8;color:#ffffff;font-weight:600}
-  .fade-in{animation:fadeIn .2s ease-out}
-  @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  :root{
+    --forest:#16302A;
+    --forest-2:#1E4238;
+    --forest-3:#295A4C;
+    --paper:#F1EFE5;
+    --paper-2:#E8E5D8;
+    --card:#FFFEFA;
+    --ink:#1C1B16;
+    --ink-soft:#5B5A4E;
+    --line:#DCD7C6;
+    --gold:#B98A2E;
+    --gold-deep:#8F6A22;
+    --clay:#93472C;
+    --sky:#3E6B79;
+    --good:#2F6B45;
+    --bad:#93412C;
+    --warn:#B98A2E;
+    --radius:6px;
+    --shadow:0 1px 2px rgba(28,27,22,0.06);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'IBM Plex Sans',sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    font-size:14px;
+    line-height:1.5;
+  }
+  h1,h2,h3,.brand{font-family:'Fraunces',serif;}
+  a{color:inherit;}
+  button{font-family:inherit;font-size:inherit;cursor:pointer;}
+  input,select,textarea{font-family:inherit;font-size:inherit;}
+
+  #app{display:flex;min-height:100vh;}
+
+ 
+  #sidebar{
+    width:230px;
+    flex-shrink:0;
+    background:var(--forest);
+    color:#E7E4D6;
+    display:flex;
+    flex-direction:column;
+    position:fixed;
+    top:0;left:0;bottom:0;
+    overflow-y:auto;
+  }
+  #sidebar::-webkit-scrollbar{width:6px;}
+  #sidebar::-webkit-scrollbar-thumb{background:var(--forest-3);border-radius:3px;}
+  .brandbar{
+    padding:22px 20px 16px 20px;
+    border-bottom:1px solid rgba(255,255,255,0.08);
+  }
+  .brandbar .brand{
+    font-size:20px;
+    font-weight:600;
+    color:#F4E9C9;
+    letter-spacing:0.2px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .brandbar .brand svg{flex-shrink:0;}
+  .brandbar .tagline{
+    font-size:11.5px;
+    color:#9FB3A9;
+    margin-top:3px;
+  }
+  nav{padding:10px 0 20px 0;flex:1;}
+  .navgroup{margin-bottom:2px;}
+  .navgroup-label{
+    font-size:11px;
+    color:#7E9689;
+    padding:14px 20px 6px 20px;
+    letter-spacing:0.4px;
+  }
+  .navitem{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:8px 20px;
+    font-size:13.5px;
+    color:#D6D2C0;
+    cursor:pointer;
+    border-left:3px solid transparent;
+    transition:background .12s;
+  }
+  .navitem:hover{background:rgba(255,255,255,0.05);}
+  .navitem.active{
+    background:rgba(255,255,255,0.08);
+    border-left:3px solid var(--gold);
+    color:#F7EFD8;
+    font-weight:600;
+  }
+  .navitem .dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:0.5;flex-shrink:0;}
+
+ 
+  #main{margin-left:230px;flex:1;min-width:0;display:flex;flex-direction:column;}
+  #topbar{
+    height:60px;
+    background:var(--card);
+    border-bottom:1px solid var(--line);
+    display:flex;
+    align-items:center;
+    padding:0 24px;
+    gap:16px;
+    position:sticky;
+    top:0;
+    z-index:20;
+  }
+  #topbar .search{
+    flex:1;
+    max-width:380px;
+    position:relative;
+  }
+  #topbar .search input{
+    width:100%;
+    padding:8px 12px 8px 32px;
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    background:var(--paper);
+    color:var(--ink);
+  }
+  #topbar .search input:focus{outline:2px solid var(--gold);outline-offset:-1px;}
+  #topbar .search::before{
+    content:"⌕";
+    position:absolute;left:10px;top:50%;transform:translateY(-50%);
+    color:var(--ink-soft);font-size:15px;
+  }
+  .spacer{flex:1;}
+  .iconbtn{
+    background:none;border:1px solid transparent;
+    width:34px;height:34px;border-radius:var(--radius);
+    display:flex;align-items:center;justify-content:center;
+    color:var(--ink-soft);position:relative;
+  }
+  .iconbtn:hover{background:var(--paper);border-color:var(--line);}
+  .badge{
+    position:absolute;top:2px;right:2px;
+    background:var(--clay);color:#fff;
+    font-size:9.5px;font-weight:700;
+    min-width:14px;height:14px;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;
+    padding:0 3px;
+  }
+  .btn{
+    padding:8px 14px;
+    border-radius:var(--radius);
+    border:1px solid var(--line);
+    background:var(--card);
+    color:var(--ink);
+    font-weight:600;
+    font-size:13px;
+    display:inline-flex;align-items:center;gap:6px;
+  }
+  .btn:hover{border-color:#c7c2ac;}
+  .btn-primary{
+    background:var(--forest);
+    color:#F4E9C9;
+    border-color:var(--forest);
+  }
+  .btn-primary:hover{background:var(--forest-2);}
+  .btn-gold{
+    background:var(--gold);
+    color:#2B2005;
+    border-color:var(--gold);
+  }
+  .btn-gold:hover{background:var(--gold-deep);color:#fff;}
+  .btn-ghost{background:transparent;border-color:transparent;}
+  .btn-ghost:hover{background:var(--paper);}
+  .btn-sm{padding:5px 10px;font-size:12px;}
+  .btn-danger{color:var(--bad);}
+
+  .userchip{
+    display:flex;align-items:center;gap:8px;
+    padding:4px 8px 4px 4px;border-radius:20px;
+    border:1px solid var(--line);
+  }
+  .avatar{
+    width:26px;height:26px;border-radius:50%;
+    background:var(--sky);color:#fff;
+    display:flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:700;
+  }
+
+  #content{padding:24px 28px 60px 28px;max-width:1280px;}
+  .view{display:none;}
+  .view.active{display:block;animation:fadeIn .18s ease;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(3px);}to{opacity:1;transform:none;}}
+
+  .pageheader{
+    display:flex;align-items:flex-end;justify-content:space-between;
+    margin-bottom:20px;flex-wrap:wrap;gap:12px;
+  }
+  .pageheader h1{font-size:24px;margin:0 0 3px 0;font-weight:600;}
+  .pageheader .sub{color:var(--ink-soft);font-size:13px;}
+  .pageheader .actions{display:flex;gap:8px;}
+
+ 
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;}
+  @media(max-width:1000px){.kpi-row{grid-template-columns:repeat(2,1fr);}}
+  .kpi{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 16px 14px 16px;
+  }
+  .kpi .label{font-size:11.5px;color:var(--ink-soft);letter-spacing:0.2px;margin-bottom:6px;}
+  .kpi .value{font-size:24px;font-weight:600;font-family:'Fraunces',serif;}
+  .kpi .delta{font-size:11.5px;margin-top:4px;}
+  .kpi .delta.up{color:var(--good);}
+  .kpi .delta.down{color:var(--bad);}
+
+  .grid-2{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;}
+  @media(max-width:960px){.grid-2{grid-template-columns:1fr;}}
+
+  .panel{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 18px 16px 18px;margin-bottom:16px;
+  }
+  .panel h3{margin:0 0 12px 0;font-size:15px;font-weight:600;}
+  .panel h3 .count{color:var(--ink-soft);font-weight:400;font-size:12.5px;}
+
+  .funnel{display:flex;flex-direction:column;gap:6px;}
+  .funnel-row{display:flex;align-items:center;gap:10px;}
+  .funnel-label{width:96px;font-size:12px;color:var(--ink-soft);flex-shrink:0;}
+  .funnel-bar-wrap{flex:1;background:var(--paper-2);border-radius:4px;overflow:hidden;height:22px;}
+  .funnel-bar{height:100%;background:var(--forest-3);display:flex;align-items:center;padding-left:8px;color:#fff;font-size:11.5px;font-weight:600;border-radius:4px;}
+  .funnel-num{width:44px;text-align:right;font-size:12.5px;font-weight:600;flex-shrink:0;}
+
+  .listrow{
+    display:flex;align-items:center;gap:10px;
+    padding:9px 0;border-bottom:1px solid var(--line);
+    font-size:13px;
+  }
+  .listrow:last-child{border-bottom:none;}
+  .listrow .main{flex:1;min-width:0;}
+  .listrow .title{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .listrow .meta{color:var(--ink-soft);font-size:11.5px;}
+  .empty{color:var(--ink-soft);font-size:13px;padding:16px 0;text-align:center;}
+
+  
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{
+    text-align:left;font-size:11px;color:var(--ink-soft);
+    letter-spacing:0.3px;padding:0 10px 8px 10px;border-bottom:1px solid var(--line);
+    font-weight:600;
+  }
+  tbody td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  tbody tr:hover{background:rgba(41,90,76,0.045);}
+  tbody tr{cursor:pointer;}
+  .tablewrap{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;overflow-x:auto;}
+  .tablewrap table{min-width:640px;}
+  .tabletoolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;}
+  .tabletoolbar input,.tabletoolbar select{
+    padding:7px 10px;border:1px solid var(--line);border-radius:var(--radius);background:var(--card);
+  }
+  .rowlink{color:var(--forest-2);font-weight:600;}
+  .rowlink:hover{text-decoration:underline;}
+
+  .pill{
+    display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;
+  }
+  .pill.status-New{background:#E8ECEA;color:var(--forest-2);}
+  .pill.status-Contacted{background:#E4EEF1;color:var(--sky);}
+  .pill.status-Qualified{background:#EAF1E4;color:var(--good);}
+  .pill.status-Unqualified{background:#F1E4E4;color:var(--bad);}
+  .pill.status-Nurturing{background:#F1EBD9;color:var(--gold-deep);}
+  .pill.status-Converted{background:#DCEBDF;color:var(--good);}
+  .pill.status-Lost{background:#F1E1DA;color:var(--clay);}
+  .pill.score-Cold{background:#E7EAF0;color:#4A5A80;}
+  .pill.score-Warm{background:#F1EBD9;color:var(--gold-deep);}
+  .pill.score-Hot{background:#F3E0D6;color:var(--clay);}
+  .pill.score-VeryHot{background:#F0D4CA;color:#7A2E14;}
+
+  .avatarsm{
+    width:26px;height:26px;border-radius:50%;flex-shrink:0;
+    background:var(--paper-2);color:var(--forest-2);
+    display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;
+  }
+
+  
+  .kanban{display:flex;gap:12px;overflow-x:auto;padding-bottom:10px;}
+  .kanban-col{
+    background:var(--paper-2);border-radius:var(--radius);
+    min-width:230px;max-width:230px;flex-shrink:0;
+    display:flex;flex-direction:column;max-height:calc(100vh - 220px);
+  }
+  .kanban-col-head{
+    padding:10px 12px;font-size:12.5px;font-weight:700;
+    display:flex;justify-content:space-between;align-items:center;
+    border-bottom:2px solid var(--line);
+  }
+  .kanban-col-body{padding:8px;overflow-y:auto;flex:1;}
+  .kcard{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:10px;margin-bottom:8px;cursor:grab;box-shadow:var(--shadow);
+  }
+  .kcard.dragging{opacity:0.4;}
+  .kcard .kname{font-weight:600;font-size:13px;margin-bottom:3px;}
+  .kcard .kamount{font-size:13px;color:var(--forest-2);font-weight:700;font-family:'Fraunces',serif;}
+  .kcard .kmeta{font-size:11px;color:var(--ink-soft);margin-top:4px;}
+  .kanban-col.dragover{outline:2px dashed var(--gold);outline-offset:-4px;}
+
+  
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:16px;flex-wrap:wrap;}
+  .tab{
+    padding:9px 14px;font-size:13px;font-weight:600;color:var(--ink-soft);
+    border-bottom:2px solid transparent;cursor:pointer;
+  }
+  .tab.active{color:var(--forest);border-bottom-color:var(--gold);}
+
+ 
+  .timeline{border-left:2px solid var(--line);margin-left:8px;padding-left:18px;}
+  .tl-item{position:relative;padding-bottom:18px;}
+  .tl-item::before{
+    content:"";position:absolute;left:-23.5px;top:3px;
+    width:9px;height:9px;border-radius:50%;background:var(--gold);border:2px solid var(--card);
+  }
+  .tl-date{font-size:11px;color:var(--ink-soft);margin-bottom:2px;}
+  .tl-text{font-size:13px;}
+  .tl-group-label{font-size:11px;color:var(--ink-soft);font-weight:700;letter-spacing:0.3px;margin:14px 0 8px -18px;}
+
+
+  .modal-backdrop{
+    position:fixed;inset:0;background:rgba(20,24,20,0.45);
+    display:none;align-items:flex-start;justify-content:center;
+    z-index:100;padding:40px 16px;overflow-y:auto;
+  }
+  .modal-backdrop.open{display:flex;}
+  .modal{
+    background:var(--card);border-radius:8px;width:560px;max-width:100%;
+    box-shadow:0 12px 40px rgba(0,0,0,0.25);
+  }
+  .modal-head{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:16px 20px;border-bottom:1px solid var(--line);
+  }
+  .modal-head h3{margin:0;font-size:16px;}
+  .modal-body{padding:18px 20px;max-height:70vh;overflow-y:auto;}
+  .modal-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;}
+  .closebtn{background:none;border:none;font-size:18px;color:var(--ink-soft);}
+
+  .formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .formgrid.full,.field.full{grid-column:1/-1;}
+  .field label{display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:4px;font-weight:600;}
+  .field input,.field select,.field textarea{
+    width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius);
+    background:var(--paper);color:var(--ink);
+  }
+  .field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--gold);outline-offset:-1px;background:var(--card);}
+  .field textarea{resize:vertical;min-height:60px;}
+
+  .toast-wrap{position:fixed;bottom:20px;right:20px;z-index:200;display:flex;flex-direction:column;gap:8px;}
+  .toast{
+    background:var(--forest);color:#F4E9C9;padding:10px 16px;border-radius:var(--radius);
+    font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,0.2);
+    animation:slideIn .2s ease;
+  }
+  @keyframes slideIn{from{transform:translateX(20px);opacity:0;}to{transform:none;opacity:1;}}
+
+  .notif-panel{
+    position:absolute;top:50px;right:24px;width:320px;
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:0 10px 30px rgba(0,0,0,0.15);
+    display:none;z-index:50;max-height:400px;overflow-y:auto;
+  }
+  .notif-panel.open{display:block;}
+  .notif-item{padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px;}
+  .notif-item:last-child{border-bottom:none;}
+  .notif-item .t{color:var(--ink-soft);font-size:10.5px;margin-top:2px;}
+
+  .detail-header{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 20px;margin-bottom:16px;
+  }
+  .detail-header .top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+  .detail-header h2{margin:0 0 4px 0;font-size:20px;}
+  .detail-header .sub2{color:var(--ink-soft);font-size:12.5px;}
+  .fieldsgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 24px;margin-top:14px;}
+  @media(max-width:800px){.fieldsgrid{grid-template-columns:repeat(2,1fr);}}
+  .fieldsgrid .k{font-size:11px;color:var(--ink-soft);margin-bottom:2px;}
+  .fieldsgrid .v{font-size:13.5px;font-weight:600;}
+
+  .backlink{font-size:12.5px;color:var(--ink-soft);margin-bottom:10px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;}
+  .backlink:hover{color:var(--ink);}
+
+  .reportbar-row{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:12.5px;}
+  .reportbar-label{width:140px;flex-shrink:0;color:var(--ink-soft);}
+  .reportbar-track{flex:1;height:14px;background:var(--paper-2);border-radius:3px;overflow:hidden;}
+  .reportbar-fill{height:100%;background:var(--gold);border-radius:3px;}
+  .reportbar-val{width:56px;text-align:right;font-weight:600;flex-shrink:0;}
+
+  .calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
+  .cal-head{background:var(--paper-2);padding:8px;font-size:11px;font-weight:700;text-align:center;color:var(--ink-soft);}
+  .cal-cell{background:var(--card);min-height:88px;padding:6px;font-size:11px;}
+  .cal-cell.muted{background:var(--paper);color:var(--ink-soft);}
+  .cal-daynum{font-size:11px;color:var(--ink-soft);margin-bottom:4px;}
+  .cal-item{background:var(--paper-2);border-radius:3px;padding:2px 5px;margin-bottom:2px;font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .cal-item.done{text-decoration:line-through;opacity:.6;}
+
+  .checklist-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);}
+  .checklist-item:last-child{border-bottom:none;}
+  .checklist-item input[type=checkbox]{width:16px;height:16px;flex-shrink:0;}
+  .checklist-item.done .cltext{text-decoration:line-through;color:var(--ink-soft);}
+  .cltext{flex:1;font-size:13px;}
+  .cltag{font-size:10.5px;color:#fff;background:var(--sky);padding:1px 7px;border-radius:10px;flex-shrink:0;}
+  .cltag.overdue{background:var(--bad);}
+
+  .settings-card{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);}
+  .settings-card:last-child{border-bottom:none;}
+  .settings-card .t{font-weight:600;font-size:13.5px;}
+  .settings-card .d{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+
+  /* ===== Auth screen ===== */
+  #authScreen{
+    position:fixed;inset:0;z-index:500;
+    background:var(--forest);
+    display:flex;align-items:stretch;justify-content:center;
+    overflow-y:auto;
+  }
+  .auth-wrap{
+    display:flex;width:100%;max-width:920px;margin:auto;
+    background:var(--card);border-radius:10px;overflow:hidden;
+    box-shadow:0 20px 60px rgba(0,0,0,0.35);
+    min-height:520px;
+  }
+  @media(max-width:760px){ .auth-wrap{flex-direction:column;min-height:0;max-width:440px;} }
+  .auth-side{
+    flex:1;background:linear-gradient(160deg,var(--forest) 0%,var(--forest-2) 60%,var(--forest-3) 100%);
+    color:#EFE9D3;padding:44px 36px;display:flex;flex-direction:column;justify-content:space-between;
+  }
+  @media(max-width:760px){ .auth-side{padding:28px;} }
+  .auth-side .brand{font-size:22px;font-weight:600;color:#F4E9C9;display:flex;align-items:center;gap:9px;}
+  .auth-side .pitch{font-size:13.5px;line-height:1.7;color:#CBD9CF;margin-top:20px;max-width:280px;}
+  .auth-side .pitch-list{margin-top:18px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;color:#DCE7DE;}
+  .auth-side .pitch-list div{display:flex;gap:8px;align-items:flex-start;}
+  .auth-side .foot{font-size:11px;color:#8AA093;}
+  .auth-form-panel{flex:1;padding:44px 40px;display:flex;flex-direction:column;justify-content:center;}
+  @media(max-width:760px){ .auth-form-panel{padding:30px 28px;} }
+  .auth-tabs{display:flex;gap:4px;margin-bottom:22px;background:var(--paper);border-radius:8px;padding:4px;}
+  .auth-tab{flex:1;text-align:center;padding:8px 0;border-radius:6px;font-size:13px;font-weight:600;color:var(--ink-soft);cursor:pointer;}
+  .auth-tab.active{background:var(--card);color:var(--forest);box-shadow:var(--shadow);}
+  .auth-form-panel h2{margin:0 0 4px 0;font-size:20px;}
+  .auth-form-panel .sub{color:var(--ink-soft);font-size:12.5px;margin-bottom:20px;}
+  .auth-field{margin-bottom:13px;}
+  .auth-field label{display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:4px;font-weight:600;}
+  .auth-field input{
+    width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius);
+    background:var(--paper);color:var(--ink);
+  }
+  .auth-field input:focus{outline:2px solid var(--gold);outline-offset:-1px;background:var(--card);}
+  .auth-error{
+    background:#F3E0D6;color:var(--clay);font-size:12.5px;padding:9px 12px;border-radius:var(--radius);margin-bottom:13px;display:none;
+  }
+  .auth-error.show{display:block;}
+  .auth-submit{width:100%;padding:11px 0;margin-top:6px;font-size:13.5px;}
+  .auth-switch{font-size:12.5px;color:var(--ink-soft);text-align:center;margin-top:16px;}
+  .auth-switch a{color:var(--forest-2);font-weight:600;cursor:pointer;text-decoration:none;}
+  .auth-switch a:hover{text-decoration:underline;}
+  #app{display:none;}
+  #app.ready{display:flex;}
+
+  .mobilebar{display:none;}
+  @media(max-width:840px){
+    #sidebar{transform:translateX(-100%);transition:transform .2s ease;z-index:99;}
+    #sidebar.open{transform:none;}
+    #main{margin-left:0;}
+    .mobilebar{display:flex;}
+    .kpi-row{grid-template-columns:repeat(2,1fr);}
+    .fieldsgrid{grid-template-columns:1fr 1fr;}
+  }
 </style>
 </head>
-<body class="text-slate-800 antialiased">
+<body>
 
-<!-- AUTH SCREEN -->
-<div id="authScreen" class="hidden fixed inset-0 z-50 bg-gradient-to-br from-acacia-900 via-acacia-800 to-slate-900 flex items-center justify-center p-4">
-  <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100">
-    <div class="p-6 text-center border-b border-slate-100 bg-slate-50/50">
-      <div class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-acacia-500 to-acacia-700 flex items-center justify-center text-white font-extrabold text-2xl shadow-lg shadow-acacia-500/30">A</div>
-      <h1 class="mt-3 text-xl font-bold text-slate-800">Acacia CRM Enterprise</h1>
-      <p class="text-xs text-slate-500 mt-1">Unified Multi-Tenant Enterprise Operating Suite</p>
-    </div>
-    <div class="flex border-b border-slate-100">
-      <button id="tabSignIn" onclick="switchAuthTab('signin')" class="flex-1 py-3 text-xs font-bold uppercase tracking-wider text-acacia-700 border-b-2 border-acacia-600 transition-all">Sign In</button>
-      <button id="tabSignUp" onclick="switchAuthTab('signup')" class="flex-1 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 border-b-2 border-transparent transition-all">Create Workspace</button>
-    </div>
-    <form id="signinForm" onsubmit="doSignIn(event)" class="p-6 space-y-4">
+<div id="authScreen">
+  <div class="auth-wrap">
+    <div class="auth-side">
       <div>
-        <label class="text-xs font-bold uppercase text-slate-500 tracking-wider">Company Name</label>
-        <input id="siCompany" type="text" required class="w-full mt-1.5 h-10 px-3 rounded-lg border border-slate-300 outline-none text-sm focus:border-acacia-600 focus:ring-1 focus:ring-acacia-600" placeholder="e.g. Spear Tech"/>
-      </div>
-      <div>
-        <label class="text-xs font-bold uppercase text-slate-500 tracking-wider">Work Email</label>
-        <input id="siEmail" type="email" required class="w-full mt-1.5 h-10 px-3 rounded-lg border border-slate-300 outline-none text-sm focus:border-acacia-600 focus:ring-1 focus:ring-acacia-600" placeholder="admin@speartech.co.ke"/>
-      </div>
-      <div>
-        <label class="text-xs font-bold uppercase text-slate-500 tracking-wider">Password</label>
-        <input id="siPass" type="password" required class="w-full mt-1.5 h-10 px-3 rounded-lg border border-slate-300 outline-none text-sm focus:border-acacia-600 focus:ring-1 focus:ring-acacia-600"/>
-      </div>
-      <button type="submit" class="w-full h-11 rounded-lg bg-acacia-600 hover:bg-acacia-700 text-white font-semibold text-sm transition-all shadow-md shadow-acacia-600/20">Sign In to CRM</button>
-      <p id="siError" class="text-xs text-red-500 hidden font-medium"></p>
-    </form>
-    <form id="signupForm" onsubmit="doSignUp(event)" class="hidden p-6 space-y-3">
-      <div>
-        <label class="text-xs font-bold uppercase text-slate-500 tracking-wider">Company Name</label>
-        <input id="suCompany" required class="w-full mt-1 h-9 px-3 rounded-lg border border-slate-300 outline-none text-sm focus:border-acacia-600"/>
-      </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div><label class="text-xs font-bold uppercase text-slate-500 tracking-wider">First Name</label><input id="suFirst" required class="w-full mt-1 h-9 px-3 rounded-lg border border-slate-300 outline-none text-sm focus:border-acacia-600"/></div>
-        <div><label class="text-xs font-bold uppercase text-slate-500 tracking-wider">Last Name</label><input id="suLast" required class="w-full mt-1 h-9 px-3 rounded-lg border border-slate-300 outline-none text-sm focus:border-acacia-600"/></div>
-      </div>
-      <div>
-        <label class="text-xs font-bold uppercase text-slate-500 tracking-wider">Work Email</label>
-        <input id="suEmail" type="email" required class="w-full mt-1 h-9 px-3 rounded-lg border border-slate-300 outline-none text-sm focus:border-acacia-600"/>
-      </div>
-      <div>
-        <label class="text-xs font-bold uppercase text-slate-500 tracking-wider">Password</label>
-        <input id="suPass" type="password" required minlength="6" class="w-full mt-1 h-9 px-3 rounded-lg border border-slate-300 outline-none text-sm focus:border-acacia-600"/>
-      </div>
-      <button type="submit" class="w-full h-10 rounded-lg bg-acacia-600 hover:bg-acacia-700 text-white font-semibold text-sm mt-2">Initialize Workspace</button>
-      <p id="suError" class="text-xs text-red-500 hidden font-medium"></p>
-    </form>
-  </div>
-</div>
-
-<!-- MAIN APPLICATION -->
-<div id="app" class="hidden flex-col h-screen overflow-hidden">
-  <!-- TOP NAVBAR -->
-  <header class="flex items-center justify-between px-5 h-14 bg-white border-b border-slate-200 shrink-0 z-20">
-    <div class="flex items-center gap-4">
-      <div class="flex items-center gap-2.5 pr-4 border-r border-slate-200">
-        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-acacia-600 to-acacia-800 text-white font-black flex items-center justify-center text-base shadow-sm">A</div>
-        <div class="leading-tight">
-          <div id="workspaceName" class="font-bold text-slate-800 text-sm">Acacia Suite</div>
-          <div class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Enterprise CRM</div>
+        <div class="brand">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 8 5 8 9C8 11 9 12 9 12C6 12 3 14 2 18C4 17 6 17 7 17.5C5.5 19 4.5 21 4.5 22C7 21 9.5 19.5 10.5 18C10.2 20 10 21 10 22H14C14 21 13.8 20 13.5 18C14.5 19.5 17 21 19.5 22C19.5 21 18.5 19 17 17.5C18 17 20 17 22 18C21 14 18 12 15 12C15 12 16 11 16 9C16 5 12 2 12 2Z" fill="#D9A441"/></svg>
+          Acacia Books CRM
+        </div>
+        <div class="pitch">Manage leads, accounts, deals and follow-ups in one place — built for teams who want a clear view of every customer relationship.</div>
+        <div class="pitch-list">
+          <div>◆ Lead-to-deal conversion in one click</div>
+          <div>◆ Drag-and-drop sales pipeline</div>
+          <div>◆ Full customer activity timeline</div>
+          <div>◆ Built-in reports &amp; forecasting</div>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <span id="syncDot" class="w-2 h-2 rounded-full bg-slate-300"></span>
-        <span id="syncStatus" class="text-xs font-medium text-slate-500">Idle</span>
-      </div>
+      <div class="foot">Your data is stored locally in this browser.</div>
     </div>
-
-    <!-- Global Search -->
-    <div class="hidden md:flex items-center relative w-72">
-      <input id="globalSearch" type="text" onkeyup="filterGlobalData(this.value)" placeholder="Search leads, deals, contacts..." class="w-full h-8 pl-8 pr-3 text-xs bg-slate-100/80 border border-transparent rounded-lg focus:bg-white focus:border-acacia-500 outline-none transition-all">
-      <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-    </div>
-
-    <div class="flex items-center gap-2">
-      <button onclick="openAiAssistant()" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white transition-all shadow-sm flex items-center gap-1.5">
-        <span>🤖</span> AI Onboarding Assistant
-      </button>
-      <button onclick="openMail()" class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 transition-colors flex items-center gap-1.5">
-        <span>✉️</span> Compose Mail
-      </button>
-      <button onclick="pullAll()" class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 transition-colors flex items-center gap-1.5">
-        <span>↻</span> Sync Cloud
-      </button>
-
-      <!-- Apps Switcher -->
-      <div class="relative">
-        <button onclick="toggleApps()" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="5" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="19" cy="5" r="1.5"/><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="5" cy="19" r="1.5"/><circle cx="12" cy="19" r="1.5"/><circle cx="19" cy="19" r="1.5"/></svg></button>
-        <div id="appsMenu" class="hidden absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-50 text-xs py-1">
-          <div class="px-3 py-2 font-bold text-[10px] text-slate-400 uppercase tracking-wider border-b border-slate-100">Acacia Cloud Modules</div>
-          <a href="./app_1701-1_3.html" class="block px-3 py-2 hover:bg-slate-50 text-slate-700 font-medium">🏠 ERP Core Dashboard</a>
-          <a href="./acacia-mail_4.html" class="block px-3 py-2 hover:bg-slate-50 text-slate-700 font-medium">✉️ Mail & Dispatch</a>
-          <a href="./acacia-crm.html" class="block px-3 py-2 bg-acacia-50 font-bold text-acacia-700">🎯 CRM Enterprise</a>
-          <a href="./acacia-inventory.html" class="block px-3 py-2 hover:bg-slate-50 text-slate-700 font-medium">📦 Inventory & Warehouse</a>
-          <a href="./acacia-payroll.html" class="block px-3 py-2 hover:bg-slate-50 text-slate-700 font-medium">💵 Payroll & HR</a>
-          <a href="./acacia-expense.html" class="block px-3 py-2 hover:bg-slate-50 text-slate-700 font-medium">💰 Expense & Claims</a>
-        </div>
+    <div class="auth-form-panel">
+      <div class="auth-tabs">
+        <div class="auth-tab active" id="tabLoginBtn" onclick="switchAuthTab('login')">Log In</div>
+        <div class="auth-tab" id="tabRegisterBtn" onclick="switchAuthTab('register')">Create Account</div>
       </div>
 
-      <div id="userAvatar" class="w-8 h-8 rounded-full bg-acacia-700 text-white flex items-center justify-center text-xs font-bold border border-acacia-800 shadow-sm"></div>
-      <button onclick="signOut()" class="text-xs font-medium text-slate-500 hover:text-slate-800 px-2 py-1">Sign out</button>
-    </div>
-  </header>
-
-  <!-- BODY CONTENT AREA -->
-  <div class="flex flex-1 overflow-hidden relative">
-    <!-- SIDEBAR NAVIGATION -->
-    <aside class="w-60 bg-white border-r border-slate-200 p-3 overflow-y-auto shrink-0 flex flex-col justify-between">
-      <div class="space-y-4">
-        <div>
-          <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-2 mb-1.5">📊 Overview</div>
-          <button onclick="go('dashboard')" id="nav_dashboard" class="nav-btn w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-all flex items-center gap-2">
-            <span>📈</span> Executive Analytics
-          </button>
-        </div>
-
-        <div>
-          <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-2 mb-1.5">🎯 Sales & Relations</div>
-          <nav id="navListSales" class="space-y-0.5 text-xs"></nav>
-        </div>
-
-        <div>
-          <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-2 mb-1.5">📄 Billing & Products</div>
-          <nav id="navListFinance" class="space-y-0.5 text-xs"></nav>
-        </div>
-
-        <div>
-          <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-2 mb-1.5">📢 Support & Campaigns</div>
-          <nav id="navListMarketing" class="space-y-0.5 text-xs"></nav>
-        </div>
-
-        <div>
-          <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-2 mb-1.5">⚙️ Operations & Config</div>
-          <nav id="navListOps" class="space-y-0.5 text-xs"></nav>
-          <button onclick="go('settings')" id="nav_settings" class="nav-btn w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-all flex items-center gap-2 mt-1">
-            <span>⚙️</span> System Settings
-          </button>
-        </div>
+      <div id="loginPane">
+        <h2>Welcome back</h2>
+        <div class="sub">Log in to your Acacia Books CRM.</div>
+        <div class="auth-error" id="loginError"></div>
+        <div class="auth-field"><label>Email address</label><input id="loginEmail" type="email" autocomplete="username" placeholder="you@company.co.ke"></div>
+        <div class="auth-field"><label>Password</label><input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••"></div>
+        <button class="btn btn-primary auth-submit" onclick="handleLogin()">Log In</button>
+        <div class="auth-switch">Don't have an account? <a onclick="switchAuthTab('register')">Create one</a></div>
       </div>
 
-      <div class="pt-3 border-t border-slate-100 text-[10px] text-slate-400 text-center font-medium">
-        Acacia CRM v4.9 Enterprise
+      <div id="registerPane" style="display:none;">
+        <h2>Create your account</h2>
+        <div class="sub">Set up Acacia Books CRM for your company.</div>
+        <div class="auth-error" id="registerError"></div>
+        <div class="auth-field"><label>Company name</label><input id="regCompany" placeholder="e.g. Baraka Traders Ltd"></div>
+        <div class="auth-field"><label>Your name</label><input id="regName" placeholder="e.g. Wanjiru Kariuki"></div>
+        <div class="auth-field"><label>Email address</label><input id="regEmail" type="email" autocomplete="username" placeholder="you@company.co.ke"></div>
+        <div class="auth-field"><label>Password</label><input id="regPassword" type="password" autocomplete="new-password" placeholder="At least 6 characters"></div>
+        <button class="btn btn-primary auth-submit" onclick="handleRegister()">Create Account</button>
+        <div class="auth-switch">Already have an account? <a onclick="switchAuthTab('login')">Log in</a></div>
       </div>
-    </aside>
-
-    <!-- MAIN VIEW CONTAINER -->
-    <main class="flex-1 overflow-auto p-6 bg-slate-50"><div id="view" class="fade-in"></div></main>
-
-    <!-- RIGHT ACTION SIDEBAR -->
-    <aside id="rightSidebar" class="w-12 bg-white border-l border-slate-200 p-2 overflow-y-auto shrink-0 flex flex-col items-center space-y-3">
-      <button onclick="openAiAssistant()" title="AI Onboarding & Sync Guide" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg text-base text-purple-600">🤖</button>
-      <button onclick="toggleAcaciaNotebook()" title="Quick CRM Notebook" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg text-base relative">
-        📔
-        <span id="noteBadge" class="hidden absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-600 rounded-full"></span>
-      </button>
-      <button onclick="toggleWebinarPanel()" title="Meeting & Demo Scheduler" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg text-base relative">
-        🎥
-        <span id="meetingBadge" class="hidden absolute -top-1 -right-1 w-2.5 h-2.5 bg-indigo-600 rounded-full"></span>
-      </button>
-      <button onclick="toggleCommPanel()" title="Instant CRM Memo Log" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg text-base relative">
-        💬
-        <span id="memoBadge" class="hidden absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-600 rounded-full"></span>
-      </button>
-      <button onclick="toggleSupportPopup()" title="AI Knowledge Guide" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg text-base">🎧</button>
-      <div class="w-6 h-px bg-slate-200"></div>
-      <button onclick="window.open('https://docs.google.com','_blank')" title="Google Docs" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg text-base">📄</button>
-      <button onclick="window.open('https://sheets.google.com','_blank')" title="Google Sheets" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg text-base">📊</button>
-      <button onclick="window.open('https://calendar.google.com','_blank')" title="Google Calendar" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg text-base">📅</button>
-    </aside>
-  </div>
-
-  <!-- AI ASSISTANT & LOCAL STORAGE / CLOUD SYNC GUIDE MODAL -->
-  <div id="aiAssistantPanel" class="hidden fixed top-16 right-16 w-[420px] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col z-40 text-xs overflow-hidden h-[560px]">
-    <div class="p-4 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white flex justify-between items-center shrink-0">
-      <div class="flex items-center gap-2.5">
-        <span class="text-xl">🤖</span>
-        <div>
-          <div class="font-bold text-sm">Acacia AI Onboarding Assistant</div>
-          <div class="text-[10px] text-purple-200">Local Storage & Cloud Sync Helper</div>
-        </div>
-      </div>
-      <button onclick="closeAiAssistant()" class="text-purple-300 hover:text-white font-bold text-sm">✕</button>
-    </div>
-
-    <div class="p-3 bg-purple-50/50 border-b border-purple-100 flex items-center justify-between text-[11px]">
-      <span class="font-semibold text-purple-900">New User Guided Setup</span>
-      <button onclick="syncLocalAndCloudData()" class="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded font-bold transition-all shadow-sm">⚡ Sync Now</button>
-    </div>
-
-    <div id="aiAssistantChat" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
-      <!-- AI Intro Message -->
-      <div class="p-3 bg-white border border-purple-100 rounded-xl shadow-sm space-y-2">
-        <div class="font-bold text-purple-900 flex items-center gap-1.5">
-          <span>💡</span> Welcome to Acacia CRM!
-        </div>
-        <p class="text-slate-600 leading-relaxed text-[11px]">
-          I can guide you on how to enter records, save them to your browser's <b>localStorage</b>, and sync them seamlessly with <b>Supabase Cloud</b>.
-        </p>
-      </div>
-
-      <!-- Quick Walkthrough Cards -->
-      <div class="space-y-2">
-        <div class="p-2.5 bg-white border border-slate-200 rounded-lg text-[11px]">
-          <div class="font-bold text-slate-800">1. Local Storage Caching</div>
-          <p class="text-slate-500 mt-0.5">Saves user sessions, offline preferences, and instant fallback data locally on your device.</p>
-        </div>
-        <div class="p-2.5 bg-white border border-slate-200 rounded-lg text-[11px]">
-          <div class="font-bold text-slate-800">2. Supabase Cloud Sync</div>
-          <p class="text-slate-500 mt-0.5">Automatically syncs Leads, Deals, Quotes, Invoices, and Notes across your company workspace.</p>
-        </div>
-      </div>
-
-      <div class="pt-2 text-[10px] text-slate-400 font-bold uppercase tracking-wider">Ask AI Guidance Prompt:</div>
-      <div class="flex flex-wrap gap-1.5">
-        <button onclick="sendAiPrompt('How is my data saved locally?')" class="px-2.5 py-1 bg-white border border-slate-200 hover:border-purple-300 rounded-lg text-[11px] text-slate-700 font-medium">How is data saved locally?</button>
-        <button onclick="sendAiPrompt('How does cloud sync work?')" class="px-2.5 py-1 bg-white border border-slate-200 hover:border-purple-300 rounded-lg text-[11px] text-slate-700 font-medium">How does cloud sync work?</button>
-        <button onclick="sendAiPrompt('How do I back up my CRM data?')" class="px-2.5 py-1 bg-white border border-slate-200 hover:border-purple-300 rounded-lg text-[11px] text-slate-700 font-medium">How do I back up data?</button>
-      </div>
-    </div>
-
-    <!-- Interactive Query Input -->
-    <div class="p-3 bg-white border-t border-slate-200 flex gap-2">
-      <input id="aiAssistantQuery" type="text" placeholder="Ask AI how to save or sync data..." class="flex-1 h-9 px-3 border border-slate-300 rounded-lg outline-none text-xs focus:border-purple-600 bg-slate-50 focus:bg-white"/>
-      <button onclick="submitAiAssistantQuery()" class="px-4 h-9 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-lg text-xs transition-all shadow-sm">Ask</button>
-    </div>
-  </div>
-
-  <!-- 1. EXECUTIVE NOTEBOOK PANEL -->
-  <div id="acaciaNotebookPanel" class="hidden fixed top-16 right-16 w-96 bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col z-30 text-xs overflow-hidden h-[540px]">
-    <div class="p-3.5 bg-slate-900 text-white font-bold flex justify-between items-center shrink-0">
-      <div class="flex items-center gap-2">
-        <span class="text-base">📔</span>
-        <div>
-          <div class="font-bold leading-none text-xs">CRM Executive Notebook</div>
-          <div class="text-[10px] text-slate-400 font-normal">Notes, Lead Memos & Action Items</div>
-        </div>
-      </div>
-      <button onclick="toggleAcaciaNotebook()" class="text-slate-400 hover:text-white font-bold text-sm">✕</button>
-    </div>
-    
-    <div class="p-3 border-b border-slate-100 bg-slate-50 space-y-2">
-      <input id="acaciaNoteTitle" type="text" placeholder="Note Title (e.g. Acme Deal Follow-up)" class="w-full h-8 px-2.5 border border-slate-300 rounded-lg outline-none text-xs focus:border-acacia-600 bg-white"/>
-      <textarea id="acaciaNoteText" placeholder="Write details, key takeaways, next steps..." class="w-full h-14 p-2 border border-slate-300 rounded-lg outline-none text-xs focus:border-acacia-600 resize-none bg-white"></textarea>
-      <div class="flex gap-2">
-        <select id="acaciaNoteCategory" class="flex-1 h-7 border border-slate-300 rounded-md text-[11px] px-1.5 outline-none bg-white">
-          <option value="Lead Note">🎯 Lead Note</option>
-          <option value="Client Call">📞 Client Call</option>
-          <option value="Internal Idea">💡 Internal Idea</option>
-          <option value="Urgent Task">🔥 Urgent Task</option>
-        </select>
-        <select id="acaciaNotePriority" class="w-24 h-7 border border-slate-300 rounded-md text-[11px] px-1.5 outline-none bg-white">
-          <option value="Normal">Normal</option>
-          <option value="High">High ⚡</option>
-        </select>
-        <button onclick="saveAcaciaNote()" class="px-3 bg-acacia-600 hover:bg-acacia-700 text-white rounded-md font-bold text-xs transition-all">Save Note</button>
-      </div>
-    </div>
-
-    <div class="px-3 py-1.5 bg-slate-100 border-b border-slate-200 flex items-center justify-between text-[10px]">
-      <input id="searchNotes" type="text" onkeyup="renderNotebook()" placeholder="Filter notes..." class="w-full h-6 px-2 rounded border border-slate-200 text-[11px] outline-none bg-white"/>
-    </div>
-
-    <div id="acaciaNoteList" class="flex-1 overflow-y-auto p-3 space-y-2.5 bg-slate-50/50"></div>
-  </div>
-
-  <!-- 2. ADVANCED MEETING & DEMO SCHEDULER PANEL -->
-  <div id="webinarPanel" class="hidden fixed top-16 right-16 w-96 bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col z-30 text-xs overflow-hidden h-[540px]">
-    <div class="p-3.5 bg-indigo-900 text-white font-bold flex justify-between items-center shrink-0">
-      <div class="flex items-center gap-2">
-        <span class="text-base">🎥</span>
-        <div>
-          <div class="font-bold leading-none text-xs">Meeting & Demo Scheduler</div>
-          <div class="text-[10px] text-indigo-200 font-normal">Video Calls, Demos & Client Syncs</div>
-        </div>
-      </div>
-      <button onclick="toggleWebinarPanel()" class="text-indigo-300 hover:text-white font-bold text-sm">✕</button>
-    </div>
-
-    <div class="p-3 border-b border-slate-100 bg-indigo-50/40 space-y-2">
-      <input id="webinarTitle" type="text" placeholder="Meeting Title (e.g., Product Demo w/ Spear)" class="w-full h-8 px-2.5 border border-slate-300 rounded-lg outline-none text-xs focus:border-indigo-600 bg-white"/>
-      <div class="grid grid-cols-2 gap-2">
-        <input id="webinarClient" type="email" placeholder="Client/Attendee Email" class="h-8 px-2.5 border border-slate-300 rounded-lg outline-none text-xs focus:border-indigo-600 bg-white"/>
-        <input id="webinarDate" type="datetime-local" class="h-8 px-2 border border-slate-300 rounded-lg outline-none text-xs focus:border-indigo-600 bg-white"/>
-      </div>
-      <div class="flex gap-2">
-        <input id="webinarLink" type="text" placeholder="Meeting Link (Google Meet / Zoom URL)" class="flex-1 h-7 px-2 border border-slate-300 rounded-md outline-none text-[11px] bg-white"/>
-        <button onclick="addWebinar()" class="px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-md text-xs transition-all">Schedule</button>
-      </div>
-    </div>
-
-    <div id="webinarList" class="flex-1 overflow-y-auto p-3 space-y-2.5 bg-slate-50/50"></div>
-  </div>
-
-  <!-- 3. ADVANCED CRM INTERNAL MEMO LOG PANEL -->
-  <div id="commPanel" class="hidden fixed top-16 right-16 w-96 bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col z-30 text-xs overflow-hidden h-[540px]">
-    <div class="p-3.5 bg-emerald-900 text-white font-bold flex justify-between items-center shrink-0">
-      <div class="flex items-center gap-2">
-        <span class="text-base">💬</span>
-        <div>
-          <div class="font-bold leading-none text-xs">CRM Internal Memo Log</div>
-          <div class="text-[10px] text-emerald-200 font-normal">Team Dispatch & Audit Memos</div>
-        </div>
-      </div>
-      <button onclick="toggleCommPanel()" class="text-emerald-300 hover:text-white font-bold text-sm">✕</button>
-    </div>
-
-    <div class="p-3 border-b border-slate-100 bg-emerald-50/40 space-y-2">
-      <div class="grid grid-cols-2 gap-2">
-        <input id="commUser" type="text" placeholder="Recipient (e.g. Sales Team)" class="h-8 px-2.5 border border-slate-300 rounded-lg outline-none text-xs focus:border-emerald-600 bg-white"/>
-        <select id="commUrgency" class="h-8 px-2 border border-slate-300 rounded-lg outline-none text-xs bg-white">
-          <option value="Normal">🟢 Normal Memo</option>
-          <option value="Important">🟡 Important</option>
-          <option value="Critical">🔴 Urgent Action</option>
-        </select>
-      </div>
-      <textarea id="commMessage" placeholder="Type internal dispatch memo..." class="w-full h-14 p-2 border border-slate-300 rounded-lg outline-none text-xs focus:border-emerald-600 resize-none bg-white"></textarea>
-      <button onclick="sendPrivateMessage()" class="w-full h-8 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg text-xs transition-all shadow-sm">Dispatch Memo</button>
-    </div>
-
-    <div id="commLog" class="flex-1 overflow-y-auto p-3 space-y-2.5 bg-slate-50/50"></div>
-  </div>
-
-  <!-- SUPPORT GUIDE POPUP -->
-  <div id="supportPopup" class="hidden fixed bottom-12 right-16 w-96 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden text-xs">
-    <div class="bg-acacia-900 text-white p-3 flex justify-between items-center">
-      <div>
-        <div class="font-bold">🎧 Acacia Assistant</div>
-        <div class="text-[10px] text-slate-300">Operations & Settings Guide</div>
-      </div>
-      <button onclick="toggleSupportPopup()" class="text-white hover:text-slate-300 text-base font-bold">✕</button>
-    </div>
-    <div id="supportMessages" class="h-56 overflow-y-auto p-3 space-y-2 bg-slate-50">
-      <p class="text-slate-600">Need help configuring currency, leads, backups, or workspace settings? Ask below.</p>
-    </div>
-    <div class="p-2 border-t border-slate-200 bg-white flex gap-1">
-      <input id="supportQuestion" type="text" placeholder="Ask question..." class="flex-1 border border-slate-300 rounded-md px-2 py-1 outline-none text-xs"/>
-      <button onclick="sendSupportQuestion()" class="bg-acacia-700 hover:bg-acacia-800 text-white px-3 py-1 rounded-md font-bold">Send</button>
     </div>
   </div>
 </div>
 
-<!-- DYNAMIC FORM MODAL -->
-<div id="modalForm" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-  <div class="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-    <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-900 text-white">
-      <h3 id="modalTitle" class="font-bold text-sm">New Record Entry</h3>
-      <button onclick="closeModal()" class="text-slate-400 hover:text-white font-bold">✕</button>
-    </div>
-    <form id="dynamicModalForm" onsubmit="saveModalData(event)" class="p-6 overflow-y-auto space-y-4 flex-1">
-      <div id="modalFields" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-      <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
-        <button type="button" onclick="closeModal()" class="px-4 py-2 border border-slate-200 rounded-lg text-xs font-semibold hover:bg-slate-50">Cancel</button>
-        <button type="submit" class="px-5 py-2 bg-acacia-600 hover:bg-acacia-700 text-white text-xs font-semibold rounded-lg shadow-sm">Save Record</button>
+<div id="app">
+  <aside id="sidebar">
+    <div class="brandbar">
+      <div class="brand">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 8 5 8 9C8 11 9 12 9 12C6 12 3 14 2 18C4 17 6 17 7 17.5C5.5 19 4.5 21 4.5 22C7 21 9.5 19.5 10.5 18C10.2 20 10 21 10 22H14C14 21 13.8 20 13.5 18C14.5 19.5 17 21 19.5 22C19.5 21 18.5 19 17 17.5C18 17 20 17 22 18C21 14 18 12 15 12C15 12 16 11 16 9C16 5 12 2 12 2Z" fill="#C99A2E"/></svg>
+        Acacia Books CRM
       </div>
-    </form>
+      <div class="tagline">Sales &amp; customer management</div>
+    </div>
+    <nav id="navlist"></nav>
+  </aside>
+
+  <div id="main">
+    <div id="topbar">
+      <button class="iconbtn mobilebar" id="menuToggle" aria-label="Menu">☰</button>
+      <div class="search"><input id="globalSearch" placeholder="Search leads, accounts, deals..." /></div>
+      <div class="spacer"></div>
+      <button class="btn btn-gold btn-sm" id="quickAddBtn">+ New</button>
+      <div style="position:relative;">
+        <button class="iconbtn" id="notifBtn" aria-label="Notifications">🔔<span class="badge" id="notifCount" style="display:none;"></span></button>
+        <div class="notif-panel" id="notifPanel"></div>
+      </div>
+      <div class="userchip" id="userChip" onclick="toggleUserMenu(event)" style="cursor:pointer;position:relative;">
+        <div class="avatar" id="userAvatar">–</div>
+        <span style="font-size:12.5px;font-weight:600;" id="userNameLabel">–</span>
+        <div class="notif-panel" id="userMenuPanel" style="right:0;left:auto;width:160px;">
+          <div class="notif-item" style="cursor:pointer;" onclick="handleLogout()">Log out</div>
+        </div>
+      </div>
+    </div>
+    <div id="content"></div>
   </div>
 </div>
 
-<!-- MAIL COMPOSER MODAL -->
-<div id="mailModal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-  <div class="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
-    <div class="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-900 text-white">
-      <div class="font-semibold text-xs">New Dispatch · Acacia Mail</div>
-      <button onclick="closeMail()" class="text-slate-400 hover:text-white">✕</button>
-    </div>
-    <form onsubmit="sendMailFromApp(event)" class="p-5 space-y-3">
-      <div>
-        <label class="text-[11px] font-bold uppercase text-slate-500">Recipient Email</label>
-        <input id="mmTo" type="email" required class="w-full mt-1 h-9 px-3 rounded-lg border border-slate-300 text-xs outline-none focus:border-acacia-600" placeholder="client@company.com"/>
-      </div>
-      <div>
-        <label class="text-[11px] font-bold uppercase text-slate-500">Subject</label>
-        <input id="mmSubject" type="text" required class="w-full mt-1 h-9 px-3 rounded-lg border border-slate-300 text-xs outline-none focus:border-acacia-600"/>
-      </div>
-      <div>
-        <label class="text-[11px] font-bold uppercase text-slate-500">Message Body</label>
-        <textarea id="mmBody" rows="5" required class="w-full mt-1 p-3 rounded-lg border border-slate-300 text-xs outline-none focus:border-acacia-600"></textarea>
-      </div>
-      <p id="mmStatus" class="text-xs text-slate-500 font-medium"></p>
-      <div class="flex justify-end gap-2 pt-2">
-        <button type="button" onclick="closeMail()" class="px-4 h-8 rounded-lg border border-slate-200 text-xs font-medium">Cancel</button>
-        <button type="submit" class="px-5 h-8 rounded-lg bg-acacia-600 hover:bg-acacia-700 text-white text-xs font-semibold">Send Message</button>
-      </div>
-    </form>
-  </div>
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal" id="modalBox"></div>
 </div>
+
+<div class="toast-wrap" id="toastWrap"></div>
 
 <script>
-const SESSION_KEY = 'acacia_session';
-const sb = window.supabase.createClient(window.__SUPA_URL__, window.__SUPA_KEY__);
+/* =========================================================
+   ACACIA BOOKS CRM — single-file app
+   Data persists to localStorage under "acaciaCrmData"
+   ========================================================= */
 
-function currentUser(){try{return JSON.parse(localStorage.getItem(SESSION_KEY)||'null')}catch{return null}}
-function initials(n){return (n||'?').split(/\s+/).map(s=>s[0]).slice(0,2).join('').toUpperCase()}
-function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]))}
-function toCompanyId(name){ return 'comp_' + String(name||'').toLowerCase().replace(/[^a-z0-9]/g,'_'); }
+const USERS_KEY = "acaciaCrmUsers";
+const SESSION_KEY = "acaciaCrmSession";
+const STORAGE_KEY = "acaciaCrmData";
+const uid = (p)=> p + "_" + Math.random().toString(36).slice(2,9);
+const todayISO = ()=> new Date().toISOString().slice(0,10);
+const fmtDate = (iso)=> { if(!iso) return "—"; const d=new Date(iso+"T00:00:00"); return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); };
+const fmtMoney = (n)=> "KSh " + Number(n||0).toLocaleString('en-KE');
+const daysBetween = (a,b)=> Math.round((new Date(b)-new Date(a))/86400000);
+const initials = (name)=> (name||"").split(" ").filter(Boolean).slice(0,2).map(s=>s[0].toUpperCase()).join("");
 
-function switchAuthTab(t){
-  const s=t==='signin';
-  tabSignIn.className = s ? 'flex-1 py-3 text-xs font-bold uppercase tracking-wider text-acacia-700 border-b-2 border-acacia-600 transition-all' : 'flex-1 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 border-b-2 border-transparent transition-all';
-  tabSignUp.className = !s ? 'flex-1 py-3 text-xs font-bold uppercase tracking-wider text-acacia-700 border-b-2 border-acacia-600 transition-all' : 'flex-1 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 border-b-2 border-transparent transition-all';
-  signinForm.classList.toggle('hidden',!s);
-  signupForm.classList.toggle('hidden',s);
+/* ---------- Blank starting dataset (no demo data) ---------- */
+function seedData(){
+  return {accounts: [], contacts: [], leads: [], deals: [], activities: [], timeline: [], notifications: [], nextIds:{}};
 }
 
-function openAiAssistant(){ document.getElementById('aiAssistantPanel')?.classList.remove('hidden'); }
-function closeAiAssistant(){ document.getElementById('aiAssistantPanel')?.classList.add('hidden'); }
-function toggleAcaciaNotebook(){ document.getElementById('acaciaNotebookPanel')?.classList.toggle('hidden'); }
-function toggleWebinarPanel(){ document.getElementById('webinarPanel')?.classList.toggle('hidden'); }
-function toggleCommPanel(){ document.getElementById('commPanel')?.classList.toggle('hidden'); }
-function toggleSupportPopup(){ document.getElementById('supportPopup')?.classList.toggle('hidden'); }
-function toggleApps(){ appsMenu.classList.toggle('hidden'); }
+let DB = null;
+let CURRENT_USER = null;
 
-document.addEventListener('click',e=>{
-  if(!e.target.closest('#appsMenu')&&!e.target.closest('button[onclick*=toggleApps]')) appsMenu?.classList.add('hidden');
-});
+function dataKeyFor(companyId){ return STORAGE_KEY + "_" + companyId; }
 
-// AI ASSISTANT GUIDANCE LOGIC
-function sendAiPrompt(promptText){
-  const queryInput = document.getElementById('aiAssistantQuery');
-  if(queryInput){
-    queryInput.value = promptText;
-    submitAiAssistantQuery();
-  }
-}
-
-function submitAiAssistantQuery(){
-  const queryInput = document.getElementById('aiAssistantQuery');
-  const chatContainer = document.getElementById('aiAssistantChat');
-  if(!queryInput || !chatContainer) return;
-
-  const userQuery = (queryInput.value || '').trim();
-  if(!userQuery) return;
-
-  // Add User Query Message
-  const userMsg = document.createElement('div');
-  userMsg.className = 'p-2.5 bg-purple-100 text-purple-950 rounded-lg text-[11px] font-medium text-right ml-8';
-  userMsg.textContent = userQuery;
-  chatContainer.appendChild(userMsg);
-
-  queryInput.value = '';
-
-  // Generate AI Response
-  let responseText = '';
-  const q = userQuery.toLowerCase();
-
-  if(q.includes('local') || q.includes('save')){
-    responseText = '<b>Local Data Storage:</b> When you sign in or create workspace users, session info is cached in browser <code>localStorage</code> under keys like <code>acacia_session</code> and <code>users</code>. This allows rapid offline access and instant user recognition.';
-  } else if(q.includes('cloud') || q.includes('sync')){
-    responseText = '<b>Supabase Cloud Sync:</b> When you add or edit records (Leads, Deals, Notes, Memos), data is saved locally and synchronized with Supabase via key-value mappings. Click <b>↻ Sync Cloud</b> at any time to pull fresh updates.';
-  } else if(q.includes('back') || q.includes('export')){
-    responseText = '<b>CRM Data Backup:</b> Go to <b>System Settings</b> ➔ <b>Floating Tools Data Backup & Recovery</b> to download a full JSON export of your notebook, scheduled meetings, and module records.';
-  } else {
-    responseText = '<b>Acacia Guidance:</b> You can create new CRM entries using <b>+ Add Record</b>. Records are saved locally in state and synced automatically with Supabase cloud using your company workspace scope key.';
-  }
-
-  const aiMsg = document.createElement('div');
-  aiMsg.className = 'p-3 bg-white border border-purple-200 rounded-xl shadow-sm text-[11px] text-slate-700 space-y-1.5 mt-2';
-  aiMsg.innerHTML = `<div class="font-bold text-purple-900 flex items-center gap-1"><span>🤖</span> AI Assistant:</div><p>${responseText}</p>`;
-  chatContainer.appendChild(aiMsg);
-  chatContainer.scrollTop = chatContainer.scrollHeight;
-}
-
-async function syncLocalAndCloudData(){
-  setSync('syncing cloud & local…','busy');
-  await pullAll();
-  alert('Local storage and cloud database synchronized successfully!');
-}
-
-async function fetchUsers(){
+function load(companyId){
   try{
-    const { data } = await sb.from('app_state').select('value').eq('key','users').maybeSingle();
-    if(Array.isArray(data?.value)) return data.value;
-  }catch(e){ console.warn('users fetch error',e); }
-  try{ return JSON.parse(localStorage.getItem('users')||'[]'); }catch{ return []; }
+    const raw = localStorage.getItem(dataKeyFor(companyId));
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  const blank = seedData();
+  localStorage.setItem(dataKeyFor(companyId), JSON.stringify(blank));
+  return blank;
+}
+function save(){
+  if(!CURRENT_USER) return;
+  localStorage.setItem(dataKeyFor(CURRENT_USER.companyId), JSON.stringify(DB));
 }
 
-async function saveUsersCloud(users){
-  localStorage.setItem('users', JSON.stringify(users));
-  try{ await sb.from('app_state').upsert({ key:'users', value:users, updated_at:new Date().toISOString() }, { onConflict:'key' }); }catch(e){}
+/* ---------- Auth ---------- */
+function getUsers(){
+  try{ return JSON.parse(localStorage.getItem(USERS_KEY) || "[]"); }catch(e){ return []; }
+}
+function saveUsers(list){ localStorage.setItem(USERS_KEY, JSON.stringify(list)); }
+function getSession(){
+  try{ return JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); }catch(e){ return null; }
+}
+function setSession(user){ localStorage.setItem(SESSION_KEY, JSON.stringify({email:user.email, companyId:user.companyId, name:user.name, company:user.company})); }
+function clearSession(){ localStorage.removeItem(SESSION_KEY); }
+
+function switchAuthTab(which){
+  document.getElementById('tabLoginBtn').classList.toggle('active', which==='login');
+  document.getElementById('tabRegisterBtn').classList.toggle('active', which==='register');
+  document.getElementById('loginPane').style.display = which==='login' ? 'block' : 'none';
+  document.getElementById('registerPane').style.display = which==='register' ? 'block' : 'none';
+  document.getElementById('loginError').classList.remove('show');
+  document.getElementById('registerError').classList.remove('show');
 }
 
-async function doSignIn(e){
-  e.preventDefault();
-  siError.classList.add('hidden');
-  const company=(siCompany.value||'').trim();
-  const email=(siEmail.value||'').trim().toLowerCase();
-  const pass=siPass.value;
-  if(!company||!email){siError.textContent='Company name and email required.';siError.classList.remove('hidden');return}
-  const users=await fetchUsers();
-  const compId=toCompanyId(company);
-  const match=users.find(u=>(u.email||'').toLowerCase()===email && (u.companyId||toCompanyId(u.companyName||''))===compId);
-  if(!match){siError.textContent='No matching user account found for company.';siError.classList.remove('hidden');return}
-  if(match.password && match.password!==pass){siError.textContent='Incorrect password.';siError.classList.remove('hidden');return}
-  localStorage.setItem(SESSION_KEY,JSON.stringify({ email:match.email, name:match.fullName||email, companyId:compId, companyName:match.companyName||company }));
-  boot();
+function showAuthError(id, msg){
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.classList.add('show');
 }
 
-async function doSignUp(e){
-  e.preventDefault();
-  suError.classList.add('hidden');
-  const company=(suCompany.value||'').trim();
-  const email=(suEmail.value||'').trim().toLowerCase();
-  const pass=suPass.value;
-  if(!company||!email){suError.textContent='Company name and email required.';suError.classList.remove('hidden');return}
-  const users=await fetchUsers();
-  const compId=toCompanyId(company);
-  if(users.some(u=>(u.email||'').toLowerCase()===email)){
-    suError.textContent='Email already registered. Sign in instead.';suError.classList.remove('hidden');return;
-  }
-  const rec={ username:email.split('@')[0], email, password:pass, fullName:((suFirst.value||'')+' '+(suLast.value||'')).trim()||email, role:'admin', companyId:compId, companyName:company };
-  users.push(rec);
-  await saveUsersCloud(users);
-  localStorage.setItem(SESSION_KEY,JSON.stringify({ email:rec.email, name:rec.fullName, companyId:compId, companyName:company }));
-  boot();
+function handleRegister(){
+  const company = document.getElementById('regCompany').value.trim();
+  const name = document.getElementById('regName').value.trim();
+  const email = document.getElementById('regEmail').value.trim().toLowerCase();
+  const password = document.getElementById('regPassword').value;
+  if(!company || !name || !email || !password){ showAuthError('registerError','Please fill in every field.'); return; }
+  if(password.length < 6){ showAuthError('registerError','Password must be at least 6 characters.'); return; }
+  const users = getUsers();
+  if(users.some(u=>u.email===email)){ showAuthError('registerError','An account with that email already exists.'); return; }
+  const companyId = uid('co');
+  const user = {companyId, company, name, email, password};
+  users.push(user);
+  saveUsers(users);
+  setSession(user);
+  enterApp(user);
 }
 
-function signOut(){localStorage.removeItem(SESSION_KEY);location.reload()}
-function currentCompanyId(){ return currentUser()?.companyId || 'default_company'; }
-function scopedKey(k){ return k + '_' + currentCompanyId(); }
+function handleLogin(){
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+  const password = document.getElementById('loginPassword').value;
+  if(!email || !password){ showAuthError('loginError','Please enter your email and password.'); return; }
+  const users = getUsers();
+  const user = users.find(u=>u.email===email && u.password===password);
+  if(!user){ showAuthError('loginError','That email and password combination was not found.'); return; }
+  setSession(user);
+  enterApp(user);
+}
 
-// MODULE DEFINITIONS
-const MODULES = [
-  { id:'leads',       category:'sales',     label:'🎯 Leads Management', key:'crm_leads_adv', schema:[
-    {key:'name', label:'Lead Name', type:'text'}, {key:'company', label:'Company', type:'text'},
-    {key:'email', label:'Email Address', type:'email'}, {key:'phone', label:'Phone Number', type:'text'},
-    {key:'source', label:'Lead Source', type:'select', opts:['Website','Referral','Cold Call','LinkedIn','Advertisement']},
-    {key:'status', label:'Status', type:'select', opts:['New','Attempted','Contacted','Qualified','Unqualified']},
-    {key:'value', label:'Est. Value', type:'number'}, {key:'owner', label:'Lead Owner', type:'text'}
+function handleLogout(){
+  clearSession();
+  CURRENT_USER = null;
+  DB = null;
+  document.getElementById('app').classList.remove('ready');
+  document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('loginEmail').value = '';
+  document.getElementById('loginPassword').value = '';
+  switchAuthTab('login');
+}
+
+function toggleUserMenu(e){
+  e.stopPropagation();
+  document.getElementById('userMenuPanel').classList.toggle('open');
+}
+
+function enterApp(user){
+  CURRENT_USER = user;
+  DB = load(user.companyId);
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('app').classList.add('ready');
+  document.getElementById('userAvatar').textContent = initials(user.name) || 'U';
+  document.getElementById('userNameLabel').textContent = user.name;
+  initApp();
+}
+
+function addTimeline(entity, entityType, text){
+  DB.timeline.push({id:uid("tl"), entity, entityType, date: todayISO(), text});
+}
+function notify(text){
+  DB.notifications.unshift({id:uid("nt"), text, time:"Just now", read:false});
+  save(); renderNotifBadge();
+}
+
+/* ---------- Navigation config ---------- */
+const NAV = [
+  {group:null, items:[{id:"dashboard", label:"Dashboard", icon:"◆"}]},
+  {group:"Leads", items:[
+    {id:"leads", label:"Leads"},
+    {id:"lead-sources", label:"Lead Sources"},
+    {id:"lead-scoring", label:"Lead Scoring"}
   ]},
-  { id:'contacts',    category:'sales',     label:'👤 Contacts Directory', key:'crm_contacts_adv', schema:[
-    {key:'name', label:'Full Name', type:'text'}, {key:'account', label:'Account/Company', type:'text'},
-    {key:'title', label:'Job Title', type:'text'}, {key:'email', label:'Email Address', type:'email'},
-    {key:'phone', label:'Phone Number', type:'text'}, {key:'department', label:'Department', type:'text'}
+  {group:"Sales", items:[
+    {id:"accounts", label:"Accounts"},
+    {id:"contacts", label:"Contacts"},
+    {id:"deals", label:"Deals"},
+    {id:"pipeline", label:"Pipeline"},
+    {id:"forecast", label:"Forecast"}
   ]},
-  { id:'accounts',    category:'sales',     label:'🏢 Client Accounts', key:'crm_accounts_adv', schema:[
-    {key:'account_name', label:'Account Name', type:'text'}, {key:'industry', label:'Industry', type:'text'},
-    {key:'annual_revenue', label:'Annual Revenue', type:'number'}, {key:'employees', label:'Employees', type:'number'},
-    {key:'website', label:'Website', type:'text'}, {key:'city', label:'City/Headquarters', type:'text'}
+  {group:"Activities", items:[
+    {id:"tasks", label:"Tasks"},
+    {id:"calls", label:"Calls"},
+    {id:"meetings", label:"Meetings"},
+    {id:"calendar", label:"Calendar"}
   ]},
-  { id:'deals',       category:'sales',     label:'💼 Sales Pipeline / Deals', key:'crm_deals_adv', schema:[
-    {key:'deal_name', label:'Deal Title', type:'text'}, {key:'account', label:'Client Account', type:'text'},
-    {key:'amount', label:'Deal Value', type:'number'}, 
-    {key:'stage', label:'Pipeline Stage', type:'select', opts:['Qualification','Needs Analysis','Value Proposition','Proposal Sent','Negotiation','Closed Won','Closed Lost']},
-    {key:'probability', label:'Probability (%)', type:'number'}, {key:'closing_date', label:'Target Close Date', type:'date'}
+  {group:"Reports", items:[
+    {id:"reports", label:"Reports"},
+    {id:"analytics", label:"Analytics"}
   ]},
-  { id:'quotes',      category:'finance',   label:'📝 Price Quotes & Estimates', key:'crm_quotes_adv', schema:[
-    {key:'quote_number', label:'Quote Ref #', type:'text'}, {key:'subject', label:'Quote Subject', type:'text'},
-    {key:'account', label:'Target Account', type:'text'}, {key:'amount', label:'Quote Total', type:'number'},
-    {key:'status', label:'Status', type:'select', opts:['Draft','Delivered','Accepted','Declined','Expired']}, {key:'valid_until', label:'Valid Until', type:'date'}
-  ]},
-  { id:'invoices',    category:'finance',   label:'🧾 Sales Invoices', key:'crm_invoices_adv', schema:[
-    {key:'invoice_num', label:'Invoice #', type:'text'}, {key:'client_name', label:'Client Name', type:'text'},
-    {key:'amount', label:'Billed Amount', type:'number'}, 
-    {key:'status', label:'Payment Status', type:'select', opts:['Unpaid','Partially Paid','Paid','Overdue']}, {key:'due_date', label:'Due Date', type:'date'}
-  ]},
-  { id:'products',    category:'finance',   label:'🏷️ Product Price Book', key:'crm_products_adv', schema:[
-    {key:'product_code', label:'SKU Code', type:'text'}, {key:'product_name', label:'Product Name', type:'text'},
-    {key:'unit_price', label:'Unit Price', type:'number'}, {key:'category', label:'Category', type:'text'},
-    {key:'active', label:'Status', type:'select', opts:['Active','Discontinued']}
-  ]},
-  { id:'campaigns',   category:'marketing', label:'📢 Marketing Campaigns', key:'crm_campaigns_adv', schema:[
-    {key:'campaign_name', label:'Campaign Title', type:'text'}, {key:'type', label:'Type', type:'select', opts:['Email','Social Media','Webinar','Event']},
-    {key:'budget', label:'Budget', type:'number'}, {key:'status', label:'Status', type:'select', opts:['Planning','Active','Completed','Cancelled']},
-    {key:'expected_revenue', label:'Expected Return', type:'number'}
-  ]},
-  { id:'cases',       category:'marketing', label:'🎫 Support Tickets', key:'crm_cases_adv', schema:[
-    {key:'case_number', label:'Case Ref', type:'text'}, {key:'subject', label:'Issue Summary', type:'text'},
-    {key:'account', label:'Account Name', type:'text'},
-    {key:'priority', label:'Priority', type:'select', opts:['Low','Medium','High','Urgent']},
-    {key:'status', label:'Ticket Status', type:'select', opts:['New','Assigned','In Progress','Resolved','Closed']}
-  ]},
-  { id:'workflows',   category:'ops',       label:'⚡ Sales Automation Rules', key:'crm_workflows_adv', schema:[
-    {key:'rule_name', label:'Rule Name', type:'text'}, {key:'module', label:'Target Module', type:'text'},
-    {key:'trigger', label:'Trigger Condition', type:'text'}, {key:'action', label:'Automated Action', type:'text'},
-    {key:'status', label:'Status', type:'select', opts:['Active','Inactive']}
-  ]},
-  { id:'activities',  category:'ops',       label:'📅 Tasks & Call Logs', key:'crm_activities_adv', schema:[
-    {key:'subject', label:'Activity Title', type:'text'}, {key:'type', label:'Type', type:'select', opts:['Call','Meeting','Task','Followup']},
-    {key:'assigned_to', label:'Assigned Rep', type:'text'}, {key:'due_date', label:'Due Date', type:'date'},
-    {key:'status', label:'Status', type:'select', opts:['Pending','In Progress','Completed']}
+  {group:"Settings", items:[
+    {id:"settings", label:"Settings"}
   ]}
 ];
 
-const store = {};
-let notebookStore = [];
-let webinarStore = [];
-let commLogStore = [];
-
-let active = 'dashboard';
-let editingIndex = null;
-let globalSettings = {
-  currency: 'KES',
-  taxRate: 16,
-  timeZone: 'UTC+3 (Nairobi)',
-  autoEmailAlerts: true,
-  defaultLeadOwner: 'Unassigned',
-  webhookUrl: '',
-  theme: 'Light'
-};
-
-function setSync(status, tone){
-  syncStatus.textContent = status;
-  syncDot.className = 'w-2 h-2 rounded-full ' + ({ok:'bg-emerald-500',busy:'bg-amber-400 animate-pulse',err:'bg-red-500',idle:'bg-slate-300'}[tone]||'bg-slate-300');
-}
-
-async function pullOne(m){
-  try {
-    const scoped=scopedKey(m.key);
-    let { data } = await sb.from('app_state').select('value').eq('key', scoped).maybeSingle();
-    if(!data){ const r = await sb.from('app_state').select('value').eq('key', m.key).maybeSingle(); data = r.data; }
-    store[m.id] = Array.isArray(data?.value) ? data.value : [];
-  } catch(e) { store[m.id] = []; }
-}
-
-async function pullSettings(){
-  try {
-    const { data } = await sb.from('app_state').select('value').eq('key', scopedKey('crm_settings')).maybeSingle();
-    if(data?.value) globalSettings = { ...globalSettings, ...data.value };
-  } catch(e){}
-}
-
-async function pullFloatingTools(){
-  try {
-    const { data: nbData } = await sb.from('app_state').select('value').eq('key', scopedKey('crm_notebook')).maybeSingle();
-    notebookStore = Array.isArray(nbData?.value) ? nbData.value : [];
-
-    const { data: wbData } = await sb.from('app_state').select('value').eq('key', scopedKey('crm_meetings')).maybeSingle();
-    webinarStore = Array.isArray(wbData?.value) ? wbData.value : [];
-
-    const { data: cmData } = await sb.from('app_state').select('value').eq('key', scopedKey('crm_memos')).maybeSingle();
-    commLogStore = Array.isArray(cmData?.value) ? cmData.value : [];
-  } catch(e){}
-}
-
-async function pushFloatingTools(){
-  setSync('saving tools…','busy');
-  try{
-    await Promise.all([
-      sb.from('app_state').upsert({ key: scopedKey('crm_notebook'), value: notebookStore, updated_at: new Date().toISOString() }, { onConflict: 'key' }),
-      sb.from('app_state').upsert({ key: scopedKey('crm_meetings'), value: webinarStore, updated_at: new Date().toISOString() }, { onConflict: 'key' }),
-      sb.from('app_state').upsert({ key: scopedKey('crm_memos'), value: commLogStore, updated_at: new Date().toISOString() }, { onConflict: 'key' })
-    ]);
-    setSync('synced · '+(currentUser()?.companyName||'workspace'),'ok');
-  }catch(e){ setSync('save error','err'); }
-}
-
-async function pullAll(){
-  setSync('syncing…','busy');
-  try{
-    await Promise.all([pullSettings(), pullFloatingTools(), ...MODULES.map(pullOne)]);
-    setSync('synced · '+(currentUser()?.companyName||'workspace'),'ok');
-    renderNotebook();
-    renderWebinars();
-    renderCommLogs();
-    renderView();
-  }catch(e){ setSync('sync error','err'); }
-}
-
-async function pushOne(m){
-  setSync('saving…','busy');
-  const { error } = await sb.from('app_state').upsert(
-    { key: scopedKey(m.key), value: store[m.id]||[], updated_at: new Date().toISOString() },
-    { onConflict: 'key' }
-  );
-  if(error){ setSync('save error','err'); alert('Save failed: '+error.message); return false }
-  setSync('synced · '+(currentUser()?.companyName||'workspace'),'ok'); return true;
-}
-
-// ADVANCED 1: CRM NOTEBOOK CONTROLLER
-function saveAcaciaNote(){
-  const title = (document.getElementById('acaciaNoteTitle').value||'').trim();
-  const text = (document.getElementById('acaciaNoteText').value||'').trim();
-  const category = document.getElementById('acaciaNoteCategory').value;
-  const priority = document.getElementById('acaciaNotePriority').value;
-
-  if(!text && !title) return;
-  const note = {
-    id: 'n_' + Date.now(),
-    title: title || 'Untitled Note',
-    text,
-    category,
-    priority,
-    author: currentUser()?.name || 'CRM User',
-    timestamp: new Date().toLocaleString()
-  };
-  notebookStore.unshift(note);
-  document.getElementById('acaciaNoteTitle').value = '';
-  document.getElementById('acaciaNoteText').value = '';
-  renderNotebook();
-  pushFloatingTools();
-}
-
-function deleteAcaciaNote(id){
-  notebookStore = notebookStore.filter(n => n.id !== id);
-  renderNotebook();
-  pushFloatingTools();
-}
-
-function renderNotebook(){
-  const query = (document.getElementById('searchNotes')?.value || '').toLowerCase();
-  const container = document.getElementById('acaciaNoteList');
-  if(!container) return;
-
-  const filtered = notebookStore.filter(n => (n.title+n.text+n.category).toLowerCase().includes(query));
-  document.getElementById('noteBadge')?.classList.toggle('hidden', notebookStore.length === 0);
-
-  if(filtered.length === 0){
-    container.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">No notes found. Write your executive memo above.</div>`;
-    return;
-  }
-
-  container.innerHTML = filtered.map(n => `
-    <div class="p-3 bg-white border border-slate-200 rounded-xl shadow-sm text-xs relative group">
-      <div class="flex justify-between items-start">
-        <span class="font-bold text-slate-800">${escapeHtml(n.title)}</span>
-        <div class="flex items-center gap-1">
-          <span class="text-[9px] px-1.5 py-0.5 rounded font-bold ${n.priority==='High'?'bg-red-100 text-red-700':'bg-slate-100 text-slate-600'}">${n.priority}</span>
-          <button onclick="deleteAcaciaNote('${n.id}')" class="text-slate-400 hover:text-red-600 font-bold ml-1">✕</button>
-        </div>
-      </div>
-      <p class="text-slate-600 mt-1 whitespace-pre-wrap text-[11px]">${escapeHtml(n.text)}</p>
-      <div class="flex justify-between items-center mt-2.5 pt-2 border-t border-slate-100 text-[10px] text-slate-400">
-        <span class="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium">${escapeHtml(n.category)}</span>
-        <span>${n.timestamp}</span>
-      </div>
-    </div>
-  `).join('');
-}
-
-// ADVANCED 2: MEETING & DEMO SCHEDULER CONTROLLER
-function addWebinar(){
-  const title = (document.getElementById('webinarTitle').value||'').trim();
-  const client = (document.getElementById('webinarClient').value||'').trim();
-  const dt = document.getElementById('webinarDate').value;
-  const link = (document.getElementById('webinarLink').value||'').trim();
-
-  if(!title || !dt) { alert('Please specify meeting title and scheduled date/time.'); return; }
-  const meeting = {
-    id: 'm_' + Date.now(),
-    title,
-    client: client || 'No Attendee Email',
-    datetime: dt,
-    link: link || '#',
-    status: 'Scheduled',
-    created: new Date().toLocaleString()
-  };
-  webinarStore.unshift(meeting);
-  document.getElementById('webinarTitle').value = '';
-  document.getElementById('webinarClient').value = '';
-  document.getElementById('webinarDate').value = '';
-  document.getElementById('webinarLink').value = '';
-  renderWebinars();
-  pushFloatingTools();
-}
-
-function completeWebinar(id){
-  const item = webinarStore.find(w => w.id === id);
-  if(item) item.status = 'Completed';
-  renderWebinars();
-  pushFloatingTools();
-}
-
-function deleteWebinar(id){
-  webinarStore = webinarStore.filter(w => w.id !== id);
-  renderWebinars();
-  pushFloatingTools();
-}
-
-function renderWebinars(){
-  const container = document.getElementById('webinarList');
-  if(!container) return;
-
-  document.getElementById('meetingBadge')?.classList.toggle('hidden', webinarStore.length === 0);
-
-  if(webinarStore.length === 0){
-    container.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">No meetings scheduled. Book a client call above.</div>`;
-    return;
-  }
-
-  container.innerHTML = webinarStore.map(w => `
-    <div class="p-3 bg-white border border-slate-200 rounded-xl shadow-sm text-xs space-y-1.5">
-      <div class="flex justify-between items-start">
-        <span class="font-bold text-slate-800">${escapeHtml(w.title)}</span>
-        <span class="text-[9px] px-2 py-0.5 rounded-full font-bold ${w.status==='Completed'?'bg-emerald-100 text-emerald-800':'bg-indigo-100 text-indigo-800'}">${w.status}</span>
-      </div>
-      <div class="text-slate-500 text-[11px] flex items-center justify-between">
-        <span>👤 ${escapeHtml(w.client)}</span>
-        <span class="font-semibold text-indigo-700">${w.datetime.replace('T',' ')}</span>
-      </div>
-      <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px]">
-        ${w.link && w.link !== '#' ? `<a href="${w.link}" target="_blank" class="text-indigo-600 font-bold hover:underline">🚀 Launch Video Call</a>` : `<span class="text-slate-400">No URL</span>`}
-        <div class="space-x-1">
-          ${w.status!=='Completed'?`<button onclick="completeWebinar('${w.id}')" class="text-emerald-600 font-bold hover:underline">Mark Done</button>`:''}
-          <button onclick="deleteWebinar('${w.id}')" class="text-red-500 font-bold hover:underline">Delete</button>
-        </div>
-      </div>
-    </div>
-  `).join('');
-}
-
-// ADVANCED 3: CRM INTERNAL MEMO LOG CONTROLLER
-function sendPrivateMessage(){
-  const recipient = (document.getElementById('commUser').value||'').trim();
-  const urgency = document.getElementById('commUrgency').value;
-  const msg = (document.getElementById('commMessage').value||'').trim();
-
-  if(!msg) return;
-  const memo = {
-    id: 'memo_' + Date.now(),
-    sender: currentUser()?.name || currentUser()?.email || 'System Admin',
-    recipient: recipient || 'All CRM Reps',
-    urgency,
-    msg,
-    timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-  };
-  commLogStore.unshift(memo);
-  document.getElementById('commMessage').value = '';
-  renderCommLogs();
-  pushFloatingTools();
-}
-
-function deleteMemo(id){
-  commLogStore = commLogStore.filter(m => m.id !== id);
-  renderCommLogs();
-  pushFloatingTools();
-}
-
-function renderCommLogs(){
-  const container = document.getElementById('commLog');
-  if(!container) return;
-
-  document.getElementById('memoBadge')?.classList.toggle('hidden', commLogStore.length === 0);
-
-  if(commLogStore.length === 0){
-    container.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">No internal memos logged yet.</div>`;
-    return;
-  }
-
-  const badgeColor = u => u === 'Critical' ? 'bg-red-100 text-red-700 border-red-200' : (u === 'Important' ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-emerald-100 text-emerald-800 border-emerald-200');
-
-  container.innerHTML = commLogStore.map(m => `
-    <div class="p-3 bg-white border border-slate-200 rounded-xl shadow-sm text-xs space-y-1">
-      <div class="flex justify-between items-center">
-        <span class="font-bold text-slate-800">${escapeHtml(m.sender)} ➔ ${escapeHtml(m.recipient)}</span>
-        <div class="flex items-center gap-1">
-          <span class="text-[9px] px-1.5 py-0.5 border rounded-full font-bold ${badgeColor(m.urgency)}">${m.urgency}</span>
-          <button onclick="deleteMemo('${m.id}')" class="text-slate-400 hover:text-red-600 font-bold ml-1">✕</button>
-        </div>
-      </div>
-      <p class="text-slate-600 text-[11px] whitespace-pre-wrap leading-relaxed">${escapeHtml(m.msg)}</p>
-      <div class="text-[9px] text-slate-400 text-right pt-1">${m.timestamp}</div>
-    </div>
-  `).join('');
-}
-
-// BACKUP & RESTORE CONTROLLER FOR FLOATING TOOLS & CRM DATA
-function exportFloatingToolsBackup(){
-  const backupData = {
-    workspace: currentUser()?.companyName || 'Acacia Workspace',
-    companyId: currentCompanyId(),
-    exportedAt: new Date().toISOString(),
-    floatingTools: {
-      notebook: notebookStore,
-      meetings: webinarStore,
-      memos: commLogStore
-    },
-    crmModules: store,
-    settings: globalSettings
-  };
-
-  const jsonStr = JSON.stringify(backupData, null, 2);
-  const blob = new Blob([jsonStr], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `Acacia_CRM_Backup_${currentCompanyId()}_${new Date().toISOString().slice(0,10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function triggerImportBackup(e){
-  const file = e.target.files[0];
-  if(!file) return;
-
-  const reader = new FileReader();
-  reader.onload = async function(evt){
-    try {
-      const imported = JSON.parse(evt.target.result);
-      if(imported.floatingTools){
-        notebookStore = imported.floatingTools.notebook || notebookStore;
-        webinarStore = imported.floatingTools.meetings || webinarStore;
-        commLogStore = imported.floatingTools.memos || commLogStore;
-      }
-      if(imported.settings) globalSettings = { ...globalSettings, ...imported.settings };
-      if(imported.crmModules){
-        Object.keys(imported.crmModules).forEach(k => {
-          store[k] = imported.crmModules[k];
-        });
-      }
-
-      await pushFloatingTools();
-      await sb.from('app_state').upsert(
-        { key: scopedKey('crm_settings'), value: globalSettings, updated_at: new Date().toISOString() },
-        { onConflict: 'key' }
-      );
-      
-      alert('Backup file imported successfully! Synchronizing system data...');
-      renderNotebook();
-      renderWebinars();
-      renderCommLogs();
-      renderView();
-    } catch(err){
-      alert('Invalid backup file format. Please upload a valid Acacia CRM JSON export.');
-    }
-  };
-  reader.readAsText(file);
-}
-
-async function saveSettings(e){
-  e.preventDefault();
-  globalSettings.currency = document.getElementById('setCurrency').value;
-  globalSettings.taxRate = parseFloat(document.getElementById('setTax').value)||0;
-  globalSettings.timeZone = document.getElementById('setTimezone').value;
-  globalSettings.defaultLeadOwner = document.getElementById('setOwner').value;
-  globalSettings.webhookUrl = document.getElementById('setWebhook').value;
-  globalSettings.autoEmailAlerts = document.getElementById('setAlerts').checked;
-
-  setSync('saving config…','busy');
-  const { error } = await sb.from('app_state').upsert(
-    { key: scopedKey('crm_settings'), value: globalSettings, updated_at: new Date().toISOString() },
-    { onConflict: 'key' }
-  );
-  if(!error) {
-    setSync('synced','ok');
-    alert('System Settings saved successfully!');
-    renderView();
-  } else {
-    setSync('save error','err');
-  }
-}
+let currentView = "dashboard";
+let currentDetail = null; // {type, id}
 
 function renderNav(){
-  const makeBtn = m => `<button onclick="go('${m.id}')" id="nav_${m.id}" class="nav-btn w-full text-left px-3 py-1.5 rounded-lg font-medium text-slate-600 hover:bg-slate-100 transition-all ${m.id===active?'active':''}">${m.label}</button>`;
-  
-  navListSales.innerHTML = MODULES.filter(x=>x.category==='sales').map(makeBtn).join('');
-  navListFinance.innerHTML = MODULES.filter(x=>x.category==='finance').map(makeBtn).join('');
-  navListMarketing.innerHTML = MODULES.filter(x=>x.category==='marketing').map(makeBtn).join('');
-  navListOps.innerHTML = MODULES.filter(x=>x.category==='ops').map(makeBtn).join('');
-
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  const currentBtn = document.getElementById(`nav_${active}`);
-  if(currentBtn) currentBtn.classList.add('active');
-}
-
-function go(id){ active=id; renderNav(); renderView(); }
-
-function renderView(){
-  if(active === 'dashboard'){ renderDashboard(); return; }
-  if(active === 'settings'){ renderSettingsView(); return; }
-
-  const m = MODULES.find(x=>x.id===active);
-  if(!m) return;
-  const rows = store[m.id] || [];
-  
-  let grandTotal = 0;
-  rows.forEach(r => {
-    const valStr = r?.amount || r?.value || r?.budget || r?.unit_price || r?.expected_revenue || r?.annual_revenue || 0;
-    const parsed = parseFloat(valStr);
-    if (!isNaN(parsed)) grandTotal += parsed;
-  });
-
-  view.innerHTML = `
-    <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div>
-        <h2 class="text-2xl font-black tracking-tight text-slate-900">${m.label}</h2>
-        <p class="text-xs text-slate-500">Workspace: ${escapeHtml(currentUser()?.companyName || 'Acacia ERP')} · Active Currency: <b>${globalSettings.currency}</b></p>
-      </div>
-      <div class="flex gap-2">
-        <button onclick="exportCsv()" class="px-3 py-2 text-xs font-semibold border border-slate-200 rounded-lg bg-white shadow-sm hover:bg-slate-50 transition-all">Export CSV</button>
-        <button onclick="openModal()" class="px-4 py-2 text-xs font-semibold bg-acacia-600 hover:bg-acacia-700 text-white rounded-lg shadow-sm transition-all">+ Add Record</button>
-      </div>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Records</span>
-        <div class="text-2xl font-black text-slate-800 mt-1">${rows.length}</div>
-      </div>
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Aggregated Financial Total</span>
-        <div class="text-2xl font-black text-acacia-700 mt-1">${globalSettings.currency} ${grandTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-      </div>
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Data Store Key</span>
-        <div class="text-xs font-mono text-slate-600 mt-2 bg-slate-50 p-1.5 rounded border border-slate-100 truncate">${m.key}</div>
-      </div>
-    </div>
-
-    ${active==='deals' ? renderKanbanView(rows) : ''}
-
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mt-4">
-      <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-        <h3 class="font-bold text-slate-700 text-xs tracking-wider uppercase">${m.label} Data Table</h3>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="w-full text-xs">
-          <thead class="bg-slate-50 border-b border-slate-200 text-left uppercase tracking-wider font-bold text-slate-500">
-            <tr>
-              ${m.schema.map(s=>`<th class="px-4 py-3">${escapeHtml(s.label)}</th>`).join('')}
-              <th class="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100">
-            ${rows.length===0?`<tr><td colspan="${m.schema.length+1}" class="text-center text-slate-400 py-10">No records found. Click <b>+ Add Record</b> to populate data.</td></tr>`:
-            rows.map((r,i)=>`<tr class="hover:bg-slate-50/80 transition-colors">
-              ${m.schema.map(s=>`<td class="px-4 py-3 font-medium text-slate-700">${escapeHtml(r?.[s.key]??'')}</td>`).join('')}
-              <td class="px-4 py-3 text-right space-x-2">
-                <button onclick="editRow(${i})" class="text-acacia-600 hover:text-acacia-800 font-bold">Edit</button>
-                <button onclick="delRow(${i})" class="text-red-500 hover:text-red-700 font-bold">Delete</button>
-              </td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>`;
-}
-
-function renderDashboard(){
-  const deals = store['deals'] || [];
-  const leads = store['leads'] || [];
-  const invoices = store['invoices'] || [];
-  
-  const totalPipeline = deals.reduce((acc, d) => acc + (parseFloat(d.amount)||0), 0);
-  const totalBilled = invoices.reduce((acc, i) => acc + (parseFloat(i.amount)||0), 0);
-
-  view.innerHTML = `
-    <div class="mb-6">
-      <h2 class="text-2xl font-black text-slate-900">Executive Analytics Dashboard</h2>
-      <p class="text-xs text-slate-500">Real-time revenue performance & deal metrics</p>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <div class="text-[10px] font-extrabold uppercase text-slate-400">Total Leads</div>
-        <div class="text-3xl font-black text-slate-800 mt-1">${leads.length}</div>
-      </div>
-      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <div class="text-[10px] font-extrabold uppercase text-slate-400">Pipeline Deals</div>
-        <div class="text-3xl font-black text-acacia-600 mt-1">${deals.length}</div>
-      </div>
-      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <div class="text-[10px] font-extrabold uppercase text-slate-400">Pipeline Value</div>
-        <div class="text-2xl font-black text-emerald-600 mt-1">${globalSettings.currency} ${totalPipeline.toLocaleString()}</div>
-      </div>
-      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <div class="text-[10px] font-extrabold uppercase text-slate-400">Total Invoiced</div>
-        <div class="text-2xl font-black text-blue-600 mt-1">${globalSettings.currency} ${totalBilled.toLocaleString()}</div>
-      </div>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <h3 class="font-bold text-xs uppercase tracking-wider text-slate-700 mb-4">Pipeline Breakdown by Stage</h3>
-        <div class="space-y-3 text-xs">
-          ${['Qualification','Needs Analysis','Proposal Sent','Negotiation','Closed Won'].map(stage => {
-            const stageDeals = deals.filter(d => d.stage === stage);
-            const val = stageDeals.reduce((a,b)=>a+(parseFloat(b.amount)||0), 0);
-            const pct = totalPipeline > 0 ? Math.round((val/totalPipeline)*100) : 0;
-            return `
-              <div>
-                <div class="flex justify-between font-semibold mb-1">
-                  <span>${stage} (${stageDeals.length})</span>
-                  <span>${globalSettings.currency} ${val.toLocaleString()} (${pct}%)</span>
-                </div>
-                <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                  <div class="bg-acacia-600 h-full" style="width: ${pct}%"></div>
-                </div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      </div>
-
-      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <h3 class="font-bold text-xs uppercase tracking-wider text-slate-700 mb-4">Recent Lead Registrations</h3>
-        <div class="space-y-3">
-          ${leads.slice(0, 5).map(l => `
-            <div class="flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg text-xs">
-              <div>
-                <div class="font-bold text-slate-800">${escapeHtml(l.name||'Unnamed Lead')}</div>
-                <div class="text-[10px] text-slate-400">${escapeHtml(l.company||'No Company')}</div>
-              </div>
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-acacia-50 text-acacia-700 border border-acacia-100">${escapeHtml(l.status||'New')}</span>
-            </div>
-          `).join('') || '<div class="text-xs text-slate-400">No recent leads found.</div>'}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderSettingsView(){
-  view.innerHTML = `
-    <div class="mb-6">
-      <h2 class="text-2xl font-black text-slate-900">System & Workspace Settings Module</h2>
-      <p class="text-xs text-slate-500">Configure global currency, defaults, webhooks, and tools data backups</p>
-    </div>
-
-    <form onsubmit="saveSettings(event)" class="space-y-6 max-w-4xl">
-      <!-- FINANCIAL DEFAULTS -->
-      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">Financial & Localization Defaults</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-xs font-bold text-slate-600 mb-1">Base Currency Code</label>
-            <select id="setCurrency" class="w-full h-10 px-3 border border-slate-300 rounded-lg text-xs outline-none bg-white">
-              <option value="KES" ${globalSettings.currency==='KES'?'selected':''}>KES — Kenyan Shilling</option>
-              <option value="USD" ${globalSettings.currency==='USD'?'selected':''}>USD — US Dollar</option>
-              <option value="EUR" ${globalSettings.currency==='EUR'?'selected':''}>EUR — Euro</option>
-              <option value="GBP" ${globalSettings.currency==='GBP'?'selected':''}>GBP — British Pound</option>
-              <option value="UGX" ${globalSettings.currency==='UGX'?'selected':''}>UGX — Ugandan Shilling</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-600 mb-1">Standard Sales Tax Rate (%)</label>
-            <input id="setTax" type="number" value="${globalSettings.taxRate}" class="w-full h-10 px-3 border border-slate-300 rounded-lg text-xs outline-none"/>
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-600 mb-1">System Time Zone</label>
-            <input id="setTimezone" type="text" value="${escapeHtml(globalSettings.timeZone)}" class="w-full h-10 px-3 border border-slate-300 rounded-lg text-xs outline-none"/>
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-600 mb-1">Default Lead Assignment Rep</label>
-            <input id="setOwner" type="text" value="${escapeHtml(globalSettings.defaultLeadOwner)}" class="w-full h-10 px-3 border border-slate-300 rounded-lg text-xs outline-none"/>
-          </div>
-        </div>
-      </div>
-
-      <!-- AUTOMATION & WEBHOOKS -->
-      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">Automation & Webhook Integration</h3>
-        <div>
-          <label class="block text-xs font-bold text-slate-600 mb-1">Outgoing Webhook Endpoint (Trigger on Lead Creation)</label>
-          <input id="setWebhook" type="url" placeholder="https://api.yourdomain.com/hooks/crm" value="${escapeHtml(globalSettings.webhookUrl)}" class="w-full h-10 px-3 border border-slate-300 rounded-lg text-xs outline-none"/>
-        </div>
-        <div class="flex items-center gap-2 pt-2">
-          <input id="setAlerts" type="checkbox" ${globalSettings.autoEmailAlerts?'checked':''} class="rounded text-acacia-600 focus:ring-acacia-500 h-4 w-4"/>
-          <label for="setAlerts" class="text-xs font-semibold text-slate-700">Enable Automated Email Notifications for New High-Value Deals</label>
-        </div>
-      </div>
-
-      <!-- FLOATING TOOLS BACKUP & DATA RESTORE MODULE -->
-      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
-          <div>
-            <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider">💾 Floating Side-Tools Data Backup & Recovery</h3>
-            <p class="text-[11px] text-slate-500">Export or restore Quick CRM Notebooks, Scheduled Meetings, and Internal Memos</p>
-          </div>
-          <span class="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-md border border-emerald-200">Cloud & Local Sync Ready</span>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
-            <div class="font-bold text-slate-800 flex items-center gap-1.5 mb-1"><span>📔</span> Notebook Entries</div>
-            <div class="text-xl font-black text-acacia-700">${notebookStore.length} notes</div>
-            <div class="text-[10px] text-slate-400 mt-1">Lead memos, priority tags & call notes</div>
-          </div>
-          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
-            <div class="font-bold text-slate-800 flex items-center gap-1.5 mb-1"><span>🎥</span> Scheduled Meetings</div>
-            <div class="text-xl font-black text-indigo-700">${webinarStore.length} sessions</div>
-            <div class="text-[10px] text-slate-400 mt-1">Demos, video links & client calls</div>
-          </div>
-          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
-            <div class="font-bold text-slate-800 flex items-center gap-1.5 mb-1"><span>💬</span> Internal Memos</div>
-            <div class="text-xl font-black text-emerald-700">${commLogStore.length} logs</div>
-            <div class="text-[10px] text-slate-400 mt-1">Team dispatches & urgent action items</div>
-          </div>
-        </div>
-
-        <div class="flex flex-col sm:flex-row items-center gap-3 pt-2">
-          <button type="button" onclick="exportFloatingToolsBackup()" class="w-full sm:w-auto px-5 py-2.5 bg-slate-900 hover:bg-black text-white font-bold rounded-lg text-xs flex items-center justify-center gap-2 transition-all shadow-sm">
-            <span>📥</span> Download Floating Tools Backup (.json)
-          </button>
-          
-          <label class="w-full sm:w-auto px-5 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm">
-            <span>📤</span> Import & Restore Backup
-            <input type="file" accept=".json" onchange="triggerImportBackup(event)" class="hidden"/>
-          </label>
-        </div>
-      </div>
-
-      <div class="flex justify-end">
-        <button type="submit" class="px-6 py-2.5 bg-acacia-600 hover:bg-acacia-700 text-white rounded-lg font-bold text-xs shadow-md transition-all">Save System Settings</button>
-      </div>
-    </form>
-  `;
-}
-
-function renderKanbanView(rows){
-  const stages = ['Qualification','Needs Analysis','Value Proposition','Proposal Sent','Negotiation','Closed Won','Closed Lost'];
-  return `
-    <div class="mb-6">
-      <h3 class="font-bold text-slate-800 mb-3 text-xs tracking-wider uppercase">Visual Pipeline Kanban</h3>
-      <div class="flex gap-3 overflow-x-auto pb-4">
-        ${stages.map(st => {
-          const filtered = rows.filter(r => r.stage === st);
-          const total = filtered.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
-          return `
-            <div class="w-64 shrink-0 bg-slate-100/70 border border-slate-200 rounded-xl p-3 flex flex-col max-h-96">
-              <div class="flex justify-between items-center mb-1">
-                <span class="font-bold text-xs text-slate-700 truncate">${st}</span>
-                <span class="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-bold">${filtered.length}</span>
-              </div>
-              <div class="text-[11px] font-bold text-acacia-700 mb-3">${globalSettings.currency} ${total.toLocaleString()}</div>
-              <div class="space-y-2 overflow-y-auto flex-1 pr-1">
-                ${filtered.map(d => `
-                  <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm text-xs">
-                    <div class="font-bold text-slate-800">${escapeHtml(d.deal_name || 'Untitled')}</div>
-                    <div class="text-slate-500 text-[10px] mt-1">${escapeHtml(d.account || 'No Account')}</div>
-                    <div class="mt-2 font-black text-emerald-600">${globalSettings.currency} ${parseFloat(d.amount||0).toLocaleString()}</div>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    </div>
-  `;
-}
-
-function filterGlobalData(query){
-  if(!query.trim()){ renderView(); return; }
-  const q = query.toLowerCase();
-  const m = MODULES.find(x=>x.id===active);
-  if(!m) return;
-  const filtered = (store[m.id]||[]).filter(row => JSON.stringify(row).toLowerCase().includes(q));
-  
-  const tableBody = document.querySelector('tbody');
-  if(!tableBody) return;
-  
-  tableBody.innerHTML = filtered.length===0?`<tr><td colspan="${m.schema.length+1}" class="text-center text-slate-400 py-10">No matching search query entries found.</td></tr>`:
-    filtered.map((r,i)=>`<tr class="hover:bg-slate-50/80 transition-colors">
-      ${m.schema.map(s=>`<td class="px-4 py-3 font-medium text-slate-700">${escapeHtml(r?.[s.key]??'')}</td>`).join('')}
-      <td class="px-4 py-3 text-right space-x-2">
-        <button onclick="editRow(${i})" class="text-acacia-600 hover:text-acacia-800 font-bold">Edit</button>
-        <button onclick="delRow(${i})" class="text-red-500 hover:text-red-700 font-bold">Delete</button>
-      </td>
-    </tr>`).join('');
-}
-
-function openModal(index = null){
-  editingIndex = index;
-  const m = MODULES.find(x=>x.id===active);
-  if(!m) return;
-  modalTitle.textContent = index !== null ? `Edit ${m.label} Record` : `New ${m.label} Entry`;
-  const rowData = index !== null ? store[m.id][index] : {};
-  
-  modalFields.innerHTML = m.schema.map(s => {
-    const val = rowData[s.key] ?? '';
-    if(s.type === 'select') {
-      return `<div>
-        <label class="block text-xs font-semibold text-slate-600 mb-1">${s.label}</label>
-        <select name="${s.key}" class="w-full h-10 px-3 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:border-acacia-600">
-          ${s.opts.map(o => `<option value="${o}" ${val===o?'selected':''}>${o}</option>`).join('')}
-        </select>
-      </div>`;
+  const el = document.getElementById("navlist");
+  el.innerHTML = "";
+  NAV.forEach(sec=>{
+    const g = document.createElement("div");
+    g.className = "navgroup";
+    if(sec.group){
+      const lab = document.createElement("div");
+      lab.className = "navgroup-label";
+      lab.textContent = sec.group.toUpperCase();
+      g.appendChild(lab);
     }
-    return `<div>
-      <label class="block text-xs font-semibold text-slate-600 mb-1">${s.label}</label>
-      <input type="${s.type}" name="${s.key}" value="${escapeHtml(val)}" ${s.type==='number'?'step="any"':''} class="w-full h-10 px-3 border border-slate-300 rounded-lg text-xs outline-none focus:border-acacia-600"/>
-    </div>`;
-  }).join('');
-
-  modalForm.classList.remove('hidden');
-}
-
-function closeModal(){ modalForm.classList.add('hidden'); editingIndex = null; }
-
-async function saveModalData(e){
-  e.preventDefault();
-  const m = MODULES.find(x=>x.id===active);
-  const formData = new FormData(e.target);
-  const record = {};
-  m.schema.forEach(s => { record[s.key] = formData.get(s.key); });
-
-  const rows = store[m.id] || [];
-  if(editingIndex !== null) rows[editingIndex] = record;
-  else rows.push(record);
-
-  store[m.id] = rows;
-  closeModal();
-  if(await pushOne(m)) renderView(); else await pullOne(m).then(renderView);
-}
-
-function editRow(i){ openModal(i); }
-
-async function delRow(i){
-  if(!confirm('Permanently remove this entry?')) return;
-  const m = MODULES.find(x=>x.id===active);
-  store[m.id].splice(i,1);
-  if(await pushOne(m)) renderView(); else await pullOne(m).then(renderView);
-}
-
-function exportCsv(){
-  const m=MODULES.find(x=>x.id===active); const rows=store[m.id]||[];
-  const cols=m.schema.map(s=>s.key);
-  const headers=m.schema.map(s=>s.label);
-  const csv=[headers.join(','),...rows.map(r=>cols.map(c=>JSON.stringify(r?.[c]??'')).join(','))].join('\n');
-  const a=document.createElement('a');a.href='data:text/csv,'+encodeURIComponent(csv);a.download=m.key+'.csv';a.click();
-}
-
-// MAIL INTEGRATION
-const MAIL_DATA_PREFIX = 'acacia_data_';
-function openMail(){ mmStatus.textContent=''; mmTo.value=''; mmSubject.value=''; mmBody.value=''; mailModal.classList.remove('hidden'); }
-function closeMail(){ mailModal.classList.add('hidden'); }
-
-function loadMailbox(email){
-  try{ return JSON.parse(localStorage.getItem(MAIL_DATA_PREFIX+email)) || {mails:[],events:[],aiChat:[]}; }
-  catch{ return {mails:[],events:[],aiChat:[]}; }
-}
-
-function saveMailbox(email, box){
-  localStorage.setItem(MAIL_DATA_PREFIX+email, JSON.stringify(box));
-  try{ sb.from('app_state').upsert({ key: MAIL_DATA_PREFIX+email, value: box, updated_at:new Date().toISOString() }, { onConflict:'key' }); }catch(e){}
-}
-
-async function sendMailFromApp(e){
-  e.preventDefault();
-  const u = currentUser();
-  if(!u){ mmStatus.textContent='Sign in first.'; return; }
-  const to = mmTo.value.trim().toLowerCase();
-  const subject = mmSubject.value.trim();
-  const bodyText = mmBody.value.trim();
-  if(!to||!subject||!bodyText) return;
-  
-  mmStatus.textContent = 'Dispatching message…';
-  const users = await fetchUsers();
-  const recipient = users.find(x=>(x.email||'').toLowerCase()===to);
-  if(!recipient){
-    mmStatus.textContent = '❌ Recipient email not found in Acacia workspace directory.';
-    return;
-  }
-
-  const now = Date.now();
-  const mailId = 'm'+now;
-  const inbox = loadMailbox(recipient.email);
-  inbox.mails = inbox.mails || [];
-  inbox.mails.unshift({
-    id: mailId, from: u.name || u.email, email: u.email, to: recipient.email,
-    subject, preview: bodyText.slice(0,90), body: escapeHtml(bodyText).replace(/\n/g,'<br>'),
-    time: now, read: false, starred: false, folder: 'inbox'
+    sec.items.forEach(it=>{
+      const d = document.createElement("div");
+      d.className = "navitem" + (currentView===it.id ? " active":"");
+      d.innerHTML = `<span class="dot"></span>${it.label}`;
+      d.onclick = ()=>{ goTo(it.id); if(window.innerWidth<=840) document.getElementById("sidebar").classList.remove("open"); };
+      g.appendChild(d);
+    });
+    el.appendChild(g);
   });
-  saveMailbox(recipient.email, inbox);
-
-  mmStatus.textContent = '✅ Email successfully dispatched.';
-  setTimeout(closeMail, 1000);
 }
 
-function boot(){
-  const u=currentUser();
-  if(!u){ authScreen.classList.remove('hidden'); app.classList.add('hidden'); app.classList.remove('flex'); return; }
-  authScreen.classList.add('hidden'); app.classList.remove('hidden'); app.classList.add('flex');
-  userAvatar.textContent=initials(u.companyName||u.name||u.email);
-  workspaceName.textContent = u.companyName || 'Acacia Suite';
-  renderNav(); pullAll();
+function goTo(viewId, detail){
+  currentView = viewId;
+  currentDetail = detail || null;
+  renderNav();
+  renderView();
+  document.getElementById("content").scrollTop = 0;
+  window.scrollTo(0,0);
 }
 
-boot();
+/* ---------- Helpers to look up records ---------- */
+const findLead = id => DB.leads.find(x=>x.id===id);
+const findAccount = id => DB.accounts.find(x=>x.id===id);
+const findContact = id => DB.contacts.find(x=>x.id===id);
+const findDeal = id => DB.deals.find(x=>x.id===id);
+const accountContacts = accId => DB.contacts.filter(c=>c.account===accId);
+const accountDeals = accId => DB.deals.filter(d=>d.account===accId);
+const scoreLabel = (n)=> n>=76?"VeryHot":n>=51?"Hot":n>=21?"Warm":"Cold";
+const scoreLabelText = (n)=> n>=76?"Very Hot":n>=51?"Hot":n>=21?"Warm":"Cold";
+
+const STAGES = ["Qualification","Needs Analysis","Value Proposition","Proposal","Needs Analysis","Negotiation","Closed Won","Closed Lost"];
+const PIPELINE_STAGES = ["Qualification","Needs Analysis","Proposal","Negotiation","Closed Won","Closed Lost"];
+
+/* =========================================================
+   VIEW RENDERERS
+   ========================================================= */
+function renderView(){
+  const c = document.getElementById("content");
+  const map = {
+    dashboard: renderDashboard,
+    leads: renderLeads,
+    "lead-sources": renderLeadSources,
+    "lead-scoring": renderLeadScoring,
+    accounts: renderAccounts,
+    "account-detail": renderAccountDetail,
+    contacts: renderContacts,
+    deals: renderDealsList,
+    "deal-detail": renderDealDetail,
+    pipeline: renderPipeline,
+    forecast: renderForecast,
+    tasks: ()=>renderActivities("Task"),
+    calls: ()=>renderActivities("Call"),
+    meetings: ()=>renderActivities("Meeting"),
+    calendar: renderCalendar,
+    reports: renderReports,
+    analytics: renderAnalytics,
+    settings: renderSettings,
+    "lead-detail": renderLeadDetail
+  };
+  const fn = map[currentView] || renderDashboard;
+  c.innerHTML = "";
+  fn(c);
+}
+
+/* ---------- DASHBOARD ---------- */
+function renderDashboard(c){
+  const openDeals = DB.deals.filter(d=>!d.stage.startsWith("Closed"));
+  const wonDeals = DB.deals.filter(d=>d.stage==="Closed Won");
+  const lostDeals = DB.deals.filter(d=>d.stage==="Closed Lost");
+  const pipelineValue = openDeals.reduce((s,d)=>s+Number(d.amount),0);
+  const expectedRevenue = openDeals.reduce((s,d)=>s+Number(d.amount)*d.probability/100,0);
+  const totalClosed = wonDeals.length+lostDeals.length;
+  const convRate = totalClosed? Math.round(wonDeals.length/totalClosed*100):0;
+  const dueActivities = DB.activities.filter(a=>!a.done).length;
+  const newLeads = DB.leads.filter(l=>l.status==="New").length;
+
+  const funnelData = [
+    {label:"Leads", value: DB.leads.length},
+    {label:"Qualified", value: DB.leads.filter(l=>["Qualified","Nurturing","Converted"].includes(l.status)).length},
+    {label:"Opportunity", value: DB.deals.length},
+    {label:"Deals", value: openDeals.length},
+    {label:"Won", value: wonDeals.length}
+  ];
+  const maxFunnel = Math.max(...funnelData.map(f=>f.value),1);
+
+  c.innerHTML = `
+    <div class="pageheader">
+      <div><h1>Dashboard</h1><div class="sub">${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})} — here's where the pipeline stands.</div></div>
+      <div class="actions"><button class="btn btn-primary" onclick="openLeadForm()">+ New Lead</button><button class="btn" onclick="openDealForm()">+ New Deal</button></div>
+    </div>
+    <div class="kpi-row">
+      ${kpi("New Leads", newLeads)}
+      ${kpi("Open Deals", openDeals.length)}
+      ${kpi("Pipeline Value", fmtMoney(pipelineValue))}
+      ${kpi("Expected Revenue", fmtMoney(Math.round(expectedRevenue)))}
+      ${kpi("Deals Won", wonDeals.length)}
+      ${kpi("Deals Lost", lostDeals.length)}
+      ${kpi("Conversion Rate", convRate+"%")}
+      ${kpi("Activities Due", dueActivities)}
+    </div>
+    <div class="grid-2">
+      <div>
+        <div class="panel">
+          <h3>Sales funnel</h3>
+          <div class="funnel">
+            ${funnelData.map(f=>`
+              <div class="funnel-row">
+                <div class="funnel-label">${f.label}</div>
+                <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:${Math.max(6,f.value/maxFunnel*100)}%"></div></div>
+                <div class="funnel-num">${f.value}</div>
+              </div>`).join("")}
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Pipeline by stage</h3>
+          ${PIPELINE_STAGES.map(st=>{
+            const items = DB.deals.filter(d=>d.stage===st);
+            const val = items.reduce((s,d)=>s+Number(d.amount),0);
+            const max = Math.max(...PIPELINE_STAGES.map(s2=>DB.deals.filter(d=>d.stage===s2).reduce((s,d)=>s+Number(d.amount),0)),1);
+            return `<div class="reportbar-row"><div class="reportbar-label">${st}</div><div class="reportbar-track"><div class="reportbar-fill" style="width:${Math.max(3,val/max*100)}%"></div></div><div class="reportbar-val">${fmtMoney(val)}</div></div>`;
+          }).join("")}
+        </div>
+      </div>
+      <div>
+        <div class="panel">
+          <h3>Today &amp; overdue tasks <span class="count">(${DB.activities.filter(a=>!a.done).length} open)</span></h3>
+          ${listOrEmpty(DB.activities.filter(a=>!a.done).sort((a,b)=>a.due.localeCompare(b.due)).slice(0,6).map(a=>`
+            <div class="listrow"><div class="main"><div class="title">${a.title}</div><div class="meta">${a.kind} · Due ${fmtDate(a.due)} · ${a.owner}</div></div></div>
+          `), "No open tasks — nice work.")}
+        </div>
+        <div class="panel">
+          <h3>Recent leads</h3>
+          ${listOrEmpty([...DB.leads].sort((a,b)=>b.created.localeCompare(a.created)).slice(0,5).map(l=>`
+            <div class="listrow"><div class="main"><div class="title">${l.name} — ${l.company}</div><div class="meta">${l.source} · <span class="pill status-${l.status}">${l.status}</span></div></div></div>
+          `), "No leads yet.")}
+        </div>
+        <div class="panel">
+          <h3>Deals closing soon</h3>
+          ${listOrEmpty([...DB.deals].filter(d=>!d.stage.startsWith("Closed")).sort((a,b)=>a.closing.localeCompare(b.closing)).slice(0,5).map(d=>`
+            <div class="listrow"><div class="main"><div class="title">${d.name}</div><div class="meta">${fmtMoney(d.amount)} · ${fmtDate(d.closing)} · ${d.stage}</div></div></div>
+          `), "No open deals.")}
+        </div>
+      </div>
+    </div>
+  `;
+}
+function kpi(label,value,delta){
+  return `<div class="kpi"><div class="label">${label}</div><div class="value">${value}</div>${delta?`<div class="delta ${delta.dir}">${delta.text}</div>`:""}</div>`;
+}
+function listOrEmpty(rows,emptyText){
+  return rows.length ? rows.join("") : `<div class="empty">${emptyText}</div>`;
+}
+
+/* ---------- LEADS ---------- */
+let leadFilters = {status:"", search:""};
+function renderLeads(c){
+  const rows = DB.leads.filter(l=>{
+    if(leadFilters.status && l.status!==leadFilters.status) return false;
+    if(leadFilters.search){
+      const s = leadFilters.search.toLowerCase();
+      if(!(l.name.toLowerCase().includes(s)||l.company.toLowerCase().includes(s))) return false;
+    }
+    return true;
+  });
+  c.innerHTML = `
+    <div class="pageheader">
+      <div><h1>Leads</h1><div class="sub">${DB.leads.length} total leads · ${DB.leads.filter(l=>l.status==="New").length} new</div></div>
+      <div class="actions"><button class="btn btn-primary" onclick="openLeadForm()">+ New Lead</button></div>
+    </div>
+    <div class="tabletoolbar">
+      <input id="leadSearchInput" placeholder="Search name or company..." value="${leadFilters.search}" oninput="leadFilters.search=this.value;renderLeads(document.getElementById('content'))">
+      <select onchange="leadFilters.status=this.value;renderLeads(document.getElementById('content'))">
+        <option value="">All statuses</option>
+        ${["New","Contacted","Attempted Contact","Qualified","Unqualified","Nurturing","Converted","Lost"].map(s=>`<option ${leadFilters.status===s?"selected":""}>${s}</option>`).join("")}
+      </select>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Name</th><th>Company</th><th>Source</th><th>Status</th><th>Score</th><th>Owner</th><th>Next Follow-up</th><th></th></tr></thead>
+        <tbody>
+        ${rows.length ? rows.map(l=>`
+          <tr onclick="goTo('lead-detail',{type:'lead',id:'${l.id}'})">
+            <td><span class="rowlink">${l.name}</span></td>
+            <td>${l.company}</td>
+            <td>${l.source}</td>
+            <td><span class="pill status-${l.status.replace(/ /g,'')}">${l.status}</span></td>
+            <td><span class="pill score-${scoreLabel(l.score)}">${l.score} · ${scoreLabelText(l.score)}</span></td>
+            <td>${l.owner}</td>
+            <td>${l.nextFollowup?fmtDate(l.nextFollowup):"—"}</td>
+            <td onclick="event.stopPropagation()"><button class="btn btn-sm" onclick="openLeadForm('${l.id}')">Edit</button></td>
+          </tr>
+        `).join("") : `<tr><td colspan="8"><div class="empty">No leads match this filter.</div></td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderLeadDetail(c){
+  const l = findLead(currentDetail.id);
+  if(!l){ c.innerHTML = `<div class="empty">Lead not found.</div>`; return; }
+  c.innerHTML = `
+    <div class="backlink" onclick="goTo('leads')">← Back to Leads</div>
+    <div class="detail-header">
+      <div class="top">
+        <div>
+          <h2>${l.name}</h2>
+          <div class="sub2">${l.title||""} at ${l.company} · <span class="pill status-${l.status.replace(/ /g,'')}">${l.status}</span> <span class="pill score-${scoreLabel(l.score)}">${scoreLabelText(l.score)} (${l.score})</span></div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-sm" onclick="openLeadForm('${l.id}')">Edit</button>
+          ${l.status!=="Converted" ? `<button class="btn btn-gold btn-sm" onclick="convertLead('${l.id}')">Convert Lead</button>` : `<span class="pill status-Converted">Converted</span>`}
+        </div>
+      </div>
+      <div class="fieldsgrid">
+        <div><div class="k">Email</div><div class="v">${l.email||"—"}</div></div>
+        <div><div class="k">Phone</div><div class="v">${l.phone||"—"}</div></div>
+        <div><div class="k">Mobile</div><div class="v">${l.mobile||"—"}</div></div>
+        <div><div class="k">Industry</div><div class="v">${l.industry||"—"}</div></div>
+        <div><div class="k">Country / County</div><div class="v">${l.country||"—"} ${l.county?"/ "+l.county:""}</div></div>
+        <div><div class="k">Lead Source</div><div class="v">${l.source}</div></div>
+        <div><div class="k">Lead Owner</div><div class="v">${l.owner}</div></div>
+        <div><div class="k">Expected Revenue</div><div class="v">${fmtMoney(l.revenue)}</div></div>
+        <div><div class="k">Created</div><div class="v">${fmtDate(l.created)}</div></div>
+        <div><div class="k">Last Contacted</div><div class="v">${l.lastContacted?fmtDate(l.lastContacted):"—"}</div></div>
+        <div><div class="k">Next Follow-up</div><div class="v">${l.nextFollowup?fmtDate(l.nextFollowup):"—"}</div></div>
+      </div>
+    </div>
+    <div class="panel"><h3>Activities</h3>${renderRelatedActivities(l.id)}</div>
+  `;
+}
+
+function openLeadForm(id){
+  const l = id ? findLead(id) : null;
+  const body = `
+    <div class="formgrid">
+      <div class="field"><label>Full name</label><input id="f_name" value="${l?l.name:''}"></div>
+      <div class="field"><label>Company</label><input id="f_company" value="${l?l.company:''}"></div>
+      <div class="field"><label>Job title</label><input id="f_title" value="${l?l.title:''}"></div>
+      <div class="field"><label>Industry</label><input id="f_industry" value="${l?l.industry:''}"></div>
+      <div class="field"><label>Email</label><input id="f_email" value="${l?l.email:''}"></div>
+      <div class="field"><label>Phone</label><input id="f_phone" value="${l?l.phone:''}"></div>
+      <div class="field"><label>County</label><input id="f_county" value="${l?l.county:''}"></div>
+      <div class="field"><label>Lead source</label><select id="f_source">${["Website","Google","Facebook","LinkedIn","Referral","Phone","Email","Exhibition","Advertisement","Existing Customer","Manual Entry"].map(s=>`<option ${l&&l.source===s?"selected":""}>${s}</option>`).join("")}</select></div>
+      <div class="field"><label>Status</label><select id="f_status">${["New","Contacted","Attempted Contact","Qualified","Unqualified","Nurturing","Converted","Lost"].map(s=>`<option ${l&&l.status===s?"selected":""}>${s}</option>`).join("")}</select></div>
+      <div class="field"><label>Lead score (0–100)</label><input id="f_score" type="number" min="0" max="100" value="${l?l.score:20}"></div>
+      <div class="field"><label>Expected revenue (KSh)</label><input id="f_revenue" type="number" value="${l?l.revenue:0}"></div>
+      <div class="field"><label>Owner</label><input id="f_owner" value="${l?l.owner:CURRENT_USER.name}"></div>
+      <div class="field"><label>Next follow-up</label><input id="f_next" type="date" value="${l?l.nextFollowup:''}"></div>
+    </div>
+  `;
+  openModal(l?"Edit Lead":"New Lead", body, ()=>{
+    const data = {
+      name:val('f_name'), company:val('f_company'), title:val('f_title'), industry:val('f_industry'),
+      email:val('f_email'), phone:val('f_phone'), mobile:val('f_phone'), website:"", county:val('f_county'), country:"Kenya",
+      source:val('f_source'), status:val('f_status'), score:Number(val('f_score')||0), revenue:Number(val('f_revenue')||0),
+      owner:val('f_owner'), nextFollowup:val('f_next'), lastContacted:l?l.lastContacted:""
+    };
+    if(!data.name){ toast("Please enter a name."); return false; }
+    if(l){ Object.assign(l,data); notify(`Lead updated: ${data.name}`); }
+    else { data.id = uid("lead"); data.created = todayISO(); DB.leads.push(data); notify(`New lead created: ${data.name}`); }
+    save();
+    goTo(l?"lead-detail":"leads", l?{type:'lead',id:l.id}:null);
+    return true;
+  });
+}
+
+function convertLead(id){
+  const l = findLead(id);
+  if(!l) return;
+  openModal("Convert Lead", `
+    <p style="margin-top:0;font-size:13.5px;color:var(--ink-soft);">Converting <strong>${l.name}</strong> will create an Account, a Contact, and a Deal — then mark the lead as Converted.</p>
+    <div class="formgrid">
+      <div class="field full"><label>Account name</label><input id="cv_account" value="${l.company}"></div>
+      <div class="field full"><label>Deal name</label><input id="cv_deal" value="${l.company} — Initial Deal"></div>
+      <div class="field"><label>Deal amount (KSh)</label><input id="cv_amount" type="number" value="${l.revenue}"></div>
+      <div class="field"><label>Deal stage</label><select id="cv_stage">${["Qualification","Needs Analysis","Proposal","Negotiation"].map(s=>`<option>${s}</option>`).join("")}</select></div>
+    </div>
+  `, ()=>{
+    const accId = uid("acc");
+    const conId = uid("con");
+    const dealId = uid("deal");
+    const nameParts = l.name.split(" ");
+    DB.accounts.push({id:accId, name:val('cv_account'), industry:l.industry, website:l.website, phone:l.phone, email:l.email, address:l.county, country:l.country, employees:"", revenue:l.revenue, owner:l.owner, type:"Prospect", status:"Active", created:todayISO()});
+    DB.contacts.push({id:conId, first:nameParts[0]||l.name, last:nameParts.slice(1).join(" "), title:l.title, account:accId, email:l.email, phone:l.phone, mobile:l.mobile, department:"", owner:l.owner, source:l.source});
+    DB.deals.push({id:dealId, name:val('cv_deal'), account:accId, contact:conId, owner:l.owner, amount:Number(val('cv_amount')||0), probability:20, closing:"", stage:val('cv_stage'), type:"New Business", source:l.source, competitor:"", nextStep:"", description:`Converted from lead ${l.name}.`, created:todayISO()});
+    l.status = "Converted";
+    addTimeline(accId,"account", `Lead converted from ${l.name}`);
+    notify(`Lead converted: ${l.name} → Account, Contact & Deal created`);
+    save();
+    goTo("account-detail", {type:'account', id:accId});
+    return true;
+  }, "Convert");
+}
+
+/* ---------- LEAD SOURCES / SCORING (informational modules) ---------- */
+function renderLeadSources(c){
+  const sources = {};
+  DB.leads.forEach(l=> sources[l.source] = (sources[l.source]||0)+1 );
+  const max = Math.max(...Object.values(sources),1);
+  c.innerHTML = `
+    <div class="pageheader"><div><h1>Lead Sources</h1><div class="sub">Where your leads are coming from.</div></div></div>
+    <div class="panel">
+      ${Object.keys(sources).length? Object.entries(sources).sort((a,b)=>b[1]-a[1]).map(([s,n])=>`
+        <div class="reportbar-row"><div class="reportbar-label">${s}</div><div class="reportbar-track"><div class="reportbar-fill" style="width:${n/max*100}%"></div></div><div class="reportbar-val">${n}</div></div>
+      `).join("") : `<div class="empty">No leads yet.</div>`}
+    </div>
+  `;
+}
+function renderLeadScoring(c){
+  c.innerHTML = `
+    <div class="pageheader"><div><h1>Lead Scoring</h1><div class="sub">How lead scores are weighted. Adjust when you refine your qualification criteria.</div></div></div>
+    <div class="grid-2">
+      <div class="panel">
+        <h3>Scoring rules</h3>
+        ${[["Opened email","+5"],["Clicked email","+10"],["Visited website","+10"],["Requested demo","+25"],["Completed form","+15"],["Company size > 50 staff","+10"],["No activity for 30 days","−10"]].map(r=>`
+          <div class="listrow"><div class="main"><div class="title">${r[0]}</div></div><div style="font-weight:700;color:var(--forest-2)">${r[1]}</div></div>
+        `).join("")}
+      </div>
+      <div class="panel">
+        <h3>Score bands</h3>
+        <div class="listrow"><div class="main"><span class="pill score-Cold">Cold</span></div><div>0–20</div></div>
+        <div class="listrow"><div class="main"><span class="pill score-Warm">Warm</span></div><div>21–50</div></div>
+        <div class="listrow"><div class="main"><span class="pill score-Hot">Hot</span></div><div>51–75</div></div>
+        <div class="listrow"><div class="main"><span class="pill score-VeryHot">Very Hot</span></div><div>76–100</div></div>
+      </div>
+    </div>
+  `;
+}
+
+/* ---------- ACCOUNTS ---------- */
+function renderAccounts(c){
+  c.innerHTML = `
+    <div class="pageheader">
+      <div><h1>Accounts</h1><div class="sub">${DB.accounts.length} accounts</div></div>
+      <div class="actions"><button class="btn btn-primary" onclick="openAccountForm()">+ New Account</button></div>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Account</th><th>Industry</th><th>Owner</th><th>Type</th><th>Contacts</th><th>Open Deals</th><th>Status</th></tr></thead>
+        <tbody>
+        ${DB.accounts.map(a=>`
+          <tr onclick="goTo('account-detail',{type:'account',id:'${a.id}'})">
+            <td><span class="rowlink">${a.name}</span></td>
+            <td>${a.industry||"—"}</td>
+            <td>${a.owner}</td>
+            <td>${a.type}</td>
+            <td>${accountContacts(a.id).length}</td>
+            <td>${accountDeals(a.id).filter(d=>!d.stage.startsWith("Closed")).length}</td>
+            <td><span class="pill status-Qualified">${a.status}</span></td>
+          </tr>
+        `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+let accountDetailTab = "overview";
+function renderAccountDetail(c){
+  const a = findAccount(currentDetail.id);
+  if(!a){ c.innerHTML=`<div class="empty">Account not found.</div>`; return; }
+  const conts = accountContacts(a.id);
+  const dls = accountDeals(a.id);
+  const tls = DB.timeline.filter(t=>t.entity===a.id || dls.some(d=>d.id===t.entity)).sort((x,y)=>y.date.localeCompare(x.date));
+  const tabs = ["overview","contacts","deals","activities","timeline"];
+  c.innerHTML = `
+    <div class="backlink" onclick="goTo('accounts')">← Back to Accounts</div>
+    <div class="detail-header">
+      <div class="top">
+        <div><h2>${a.name}</h2><div class="sub2">${a.industry||"—"} · ${a.country||""} · Owner: ${a.owner}</div></div>
+        <div class="actions"><button class="btn btn-sm" onclick="openAccountForm('${a.id}')">Edit</button></div>
+      </div>
+    </div>
+    <div class="tabs">${tabs.map(t=>`<div class="tab ${accountDetailTab===t?'active':''}" onclick="accountDetailTab='${t}';renderView()">${t.charAt(0).toUpperCase()+t.slice(1)}</div>`).join("")}</div>
+    <div id="accTabBody"></div>
+  `;
+  const body = document.getElementById("accTabBody");
+  if(accountDetailTab==="overview"){
+    body.innerHTML = `<div class="panel"><h3>Account profile</h3><div class="fieldsgrid">
+      <div><div class="k">Website</div><div class="v">${a.website||"—"}</div></div>
+      <div><div class="k">Phone</div><div class="v">${a.phone||"—"}</div></div>
+      <div><div class="k">Email</div><div class="v">${a.email||"—"}</div></div>
+      <div><div class="k">Address</div><div class="v">${a.address||"—"}</div></div>
+      <div><div class="k">Employees</div><div class="v">${a.employees||"—"}</div></div>
+      <div><div class="k">Annual Revenue</div><div class="v">${fmtMoney(a.revenue)}</div></div>
+      <div><div class="k">Account Type</div><div class="v">${a.type}</div></div>
+      <div><div class="k">Status</div><div class="v">${a.status}</div></div>
+      <div><div class="k">Created</div><div class="v">${fmtDate(a.created)}</div></div>
+    </div></div>`;
+  } else if(accountDetailTab==="contacts"){
+    body.innerHTML = `<div class="panel"><h3>Contacts <span class="count">(${conts.length})</span></h3>
+      ${listOrEmpty(conts.map(ct=>`<div class="listrow"><div class="avatarsm">${initials(ct.first+' '+ct.last)}</div><div class="main"><div class="title">${ct.first} ${ct.last} — ${ct.title}</div><div class="meta">${ct.email} · ${ct.phone}</div></div></div>`),"No contacts linked yet.")}
+    </div>`;
+  } else if(accountDetailTab==="deals"){
+    body.innerHTML = `<div class="panel"><h3>Deals <span class="count">(${dls.length})</span></h3>
+      ${listOrEmpty(dls.map(d=>`<div class="listrow" style="cursor:pointer" onclick="goTo('deal-detail',{type:'deal',id:'${d.id}'})"><div class="main"><div class="title rowlink">${d.name}</div><div class="meta">${fmtMoney(d.amount)} · ${d.stage}</div></div></div>`),"No deals yet.")}
+    </div>`;
+  } else if(accountDetailTab==="activities"){
+    body.innerHTML = `<div class="panel"><h3>Activities</h3>${renderRelatedActivities(a.id)}</div>`;
+  } else if(accountDetailTab==="timeline"){
+    body.innerHTML = `<div class="panel"><h3>Customer timeline</h3><div class="timeline">
+      ${tls.length? tls.map(t=>`<div class="tl-item"><div class="tl-date">${fmtDate(t.date)}</div><div class="tl-text">${t.text}</div></div>`).join("") : `<div class="empty">No timeline events yet.</div>`}
+    </div></div>`;
+  }
+}
+
+function openAccountForm(id){
+  const a = id?findAccount(id):null;
+  const body = `<div class="formgrid">
+    <div class="field full"><label>Company name</label><input id="f_name" value="${a?a.name:''}"></div>
+    <div class="field"><label>Industry</label><input id="f_industry" value="${a?a.industry:''}"></div>
+    <div class="field"><label>Website</label><input id="f_website" value="${a?a.website:''}"></div>
+    <div class="field"><label>Phone</label><input id="f_phone" value="${a?a.phone:''}"></div>
+    <div class="field"><label>Email</label><input id="f_email" value="${a?a.email:''}"></div>
+    <div class="field"><label>Address</label><input id="f_address" value="${a?a.address:''}"></div>
+    <div class="field"><label>Employees</label><input id="f_employees" value="${a?a.employees:''}"></div>
+    <div class="field"><label>Annual revenue (KSh)</label><input id="f_revenue" type="number" value="${a?a.revenue:0}"></div>
+    <div class="field"><label>Owner</label><input id="f_owner" value="${a?a.owner:CURRENT_USER.name}"></div>
+    <div class="field"><label>Account type</label><select id="f_type">${["Prospect","Customer","Partner"].map(s=>`<option ${a&&a.type===s?"selected":""}>${s}</option>`).join("")}</select></div>
+  </div>`;
+  openModal(a?"Edit Account":"New Account", body, ()=>{
+    const data = {name:val('f_name'), industry:val('f_industry'), website:val('f_website'), phone:val('f_phone'), email:val('f_email'), address:val('f_address'), country:"Kenya", employees:val('f_employees'), revenue:Number(val('f_revenue')||0), owner:val('f_owner'), type:val('f_type'), status:"Active"};
+    if(!data.name){ toast("Company name is required."); return false; }
+    if(a){ Object.assign(a,data); notify(`Account updated: ${data.name}`); }
+    else { data.id=uid("acc"); data.created=todayISO(); DB.accounts.push(data); notify(`New account created: ${data.name}`); }
+    save();
+    goTo("account-detail", {type:'account', id:a?a.id:data.id});
+    return true;
+  });
+}
+
+/* ---------- CONTACTS ---------- */
+function renderContacts(c){
+  c.innerHTML = `
+    <div class="pageheader">
+      <div><h1>Contacts</h1><div class="sub">${DB.contacts.length} contacts</div></div>
+      <div class="actions"><button class="btn btn-primary" onclick="openContactForm()">+ New Contact</button></div>
+    </div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Name</th><th>Title</th><th>Account</th><th>Email</th><th>Phone</th><th>Owner</th></tr></thead>
+      <tbody>
+      ${DB.contacts.map(ct=>{
+        const acc = findAccount(ct.account);
+        return `<tr onclick="${acc?`goTo('account-detail',{type:'account',id:'${acc.id}'})`:''}">
+          <td><div style="display:flex;align-items:center;gap:8px;"><div class="avatarsm">${initials(ct.first+' '+ct.last)}</div>${ct.first} ${ct.last}</div></td>
+          <td>${ct.title||"—"}</td>
+          <td>${acc?`<span class="rowlink">${acc.name}</span>`:"—"}</td>
+          <td>${ct.email||"—"}</td>
+          <td>${ct.phone||"—"}</td>
+          <td>${ct.owner||"—"}</td>
+        </tr>`;
+      }).join("")}
+      </tbody>
+    </table></div>
+  `;
+}
+function openContactForm(){
+  const body = `<div class="formgrid">
+    <div class="field"><label>First name</label><input id="f_first"></div>
+    <div class="field"><label>Last name</label><input id="f_last"></div>
+    <div class="field"><label>Title</label><input id="f_title"></div>
+    <div class="field"><label>Account</label><select id="f_account"><option value="">— None —</option>${DB.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join("")}</select></div>
+    <div class="field"><label>Email</label><input id="f_email"></div>
+    <div class="field"><label>Phone</label><input id="f_phone"></div>
+    <div class="field"><label>Department</label><input id="f_department"></div>
+    <div class="field"><label>Owner</label><input id="f_owner" value="${CURRENT_USER.name}"></div>
+  </div>`;
+  openModal("New Contact", body, ()=>{
+    const first = val('f_first');
+    if(!first){ toast("First name is required."); return false; }
+    DB.contacts.push({id:uid("con"), first, last:val('f_last'), title:val('f_title'), account:val('f_account'), email:val('f_email'), phone:val('f_phone'), mobile:val('f_phone'), department:val('f_department'), owner:val('f_owner'), source:"Manual Entry"});
+    save(); notify(`New contact created: ${first} ${val('f_last')}`);
+    goTo("contacts");
+    return true;
+  });
+}
+
+/* ---------- DEALS (list) ---------- */
+function renderDealsList(c){
+  c.innerHTML = `
+    <div class="pageheader">
+      <div><h1>Deals</h1><div class="sub">${DB.deals.length} deals · ${fmtMoney(DB.deals.filter(d=>!d.stage.startsWith('Closed')).reduce((s,d)=>s+Number(d.amount),0))} open pipeline</div></div>
+      <div class="actions"><button class="btn" onclick="goTo('pipeline')">View pipeline</button><button class="btn btn-primary" onclick="openDealForm()">+ New Deal</button></div>
+    </div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Deal</th><th>Account</th><th>Amount</th><th>Stage</th><th>Probability</th><th>Closing</th><th>Owner</th></tr></thead>
+      <tbody>
+      ${DB.deals.map(d=>{
+        const acc = findAccount(d.account);
+        return `<tr onclick="goTo('deal-detail',{type:'deal',id:'${d.id}'})">
+          <td><span class="rowlink">${d.name}</span></td>
+          <td>${acc?acc.name:"—"}</td>
+          <td>${fmtMoney(d.amount)}</td>
+          <td><span class="pill status-Qualified">${d.stage}</span></td>
+          <td>${d.probability}%</td>
+          <td>${d.closing?fmtDate(d.closing):"—"}</td>
+          <td>${d.owner}</td>
+        </tr>`;
+      }).join("")}
+      </tbody>
+    </table></div>
+  `;
+}
+
+function renderDealDetail(c){
+  const d = findDeal(currentDetail.id);
+  if(!d){ c.innerHTML=`<div class="empty">Deal not found.</div>`; return; }
+  const acc = findAccount(d.account);
+  const cont = findContact(d.contact);
+  c.innerHTML = `
+    <div class="backlink" onclick="goTo('deals')">← Back to Deals</div>
+    <div class="detail-header">
+      <div class="top">
+        <div><h2>${d.name}</h2><div class="sub2">${fmtMoney(d.amount)} · <span class="pill status-Qualified">${d.stage}</span> · ${d.probability}% probability</div></div>
+        <div class="actions">
+          <select onchange="updateDealStage('${d.id}',this.value)" class="btn btn-sm" style="border:1px solid var(--line)">
+            ${PIPELINE_STAGES.map(s=>`<option ${s===d.stage?"selected":""}>${s}</option>`).join("")}
+          </select>
+          <button class="btn btn-sm" onclick="openDealForm('${d.id}')">Edit</button>
+        </div>
+      </div>
+      <div class="fieldsgrid">
+        <div><div class="k">Account</div><div class="v">${acc?`<span class="rowlink" onclick="goTo('account-detail',{type:'account',id:'${acc.id}'})">${acc.name}</span>`:"—"}</div></div>
+        <div><div class="k">Contact</div><div class="v">${cont?cont.first+' '+cont.last:"—"}</div></div>
+        <div><div class="k">Owner</div><div class="v">${d.owner}</div></div>
+        <div><div class="k">Closing Date</div><div class="v">${d.closing?fmtDate(d.closing):"—"}</div></div>
+        <div><div class="k">Deal Type</div><div class="v">${d.type}</div></div>
+        <div><div class="k">Lead Source</div><div class="v">${d.source}</div></div>
+        <div><div class="k">Competitor</div><div class="v">${d.competitor||"—"}</div></div>
+        <div><div class="k">Next Step</div><div class="v">${d.nextStep||"—"}</div></div>
+        <div><div class="k">Created</div><div class="v">${fmtDate(d.created)}</div></div>
+      </div>
+      ${d.description?`<div style="margin-top:12px;font-size:13px;color:var(--ink-soft)">${d.description}</div>`:""}
+    </div>
+    <div class="panel"><h3>Activities</h3>${renderRelatedActivities(d.id)}</div>
+  `;
+}
+
+function updateDealStage(id, stage){
+  const d = findDeal(id);
+  const prev = d.stage;
+  d.stage = stage;
+  if(stage==="Closed Won") d.probability=100;
+  if(stage==="Closed Lost") d.probability=0;
+  addTimeline(d.account||d.id, d.account?"account":"deal", `Deal "${d.name}" moved ${prev} → ${stage}`);
+  if(stage==="Closed Won"){
+    DB.activities.push({id:uid("act"), kind:"Task", title:`Create customer onboarding plan for ${d.name}`, related:d.id, relatedType:"deal", due:todayISO(), owner:d.owner, done:false});
+    notify(`Deal Closed Won: ${d.name}`);
+  } else if(stage==="Closed Lost"){
+    notify(`Deal Closed Lost: ${d.name}`);
+  }
+  save();
+  renderView();
+}
+
+function openDealForm(id){
+  const d = id?findDeal(id):null;
+  const body = `<div class="formgrid">
+    <div class="field full"><label>Deal name</label><input id="f_name" value="${d?d.name:''}"></div>
+    <div class="field"><label>Account</label><select id="f_account"><option value="">— None —</option>${DB.accounts.map(a=>`<option value="${a.id}" ${d&&d.account===a.id?"selected":""}>${a.name}</option>`).join("")}</select></div>
+    <div class="field"><label>Contact</label><select id="f_contact"><option value="">— None —</option>${DB.contacts.map(ct=>`<option value="${ct.id}" ${d&&d.contact===ct.id?"selected":""}>${ct.first} ${ct.last}</option>`).join("")}</select></div>
+    <div class="field"><label>Amount (KSh)</label><input id="f_amount" type="number" value="${d?d.amount:0}"></div>
+    <div class="field"><label>Probability (%)</label><input id="f_prob" type="number" min="0" max="100" value="${d?d.probability:20}"></div>
+    <div class="field"><label>Stage</label><select id="f_stage">${PIPELINE_STAGES.map(s=>`<option ${d&&d.stage===s?"selected":""}>${s}</option>`).join("")}</select></div>
+    <div class="field"><label>Closing date</label><input id="f_closing" type="date" value="${d?d.closing:''}"></div>
+    <div class="field"><label>Deal type</label><select id="f_type">${["New Business","Upsell","Renewal"].map(s=>`<option ${d&&d.type===s?"selected":""}>${s}</option>`).join("")}</select></div>
+    <div class="field"><label>Owner</label><input id="f_owner" value="${d?d.owner:CURRENT_USER.name}"></div>
+    <div class="field full"><label>Next step</label><input id="f_next" value="${d?d.nextStep:''}"></div>
+    <div class="field full"><label>Description</label><textarea id="f_desc">${d?d.description:''}</textarea></div>
+  </div>`;
+  openModal(d?"Edit Deal":"New Deal", body, ()=>{
+    const data = {name:val('f_name'), account:val('f_account'), contact:val('f_contact'), amount:Number(val('f_amount')||0), probability:Number(val('f_prob')||0), stage:val('f_stage'), closing:val('f_closing'), type:val('f_type'), owner:val('f_owner'), nextStep:val('f_next'), description:val('f_desc'), source:d?d.source:"Manual Entry", competitor:d?d.competitor:""};
+    if(!data.name){ toast("Deal name is required."); return false; }
+    if(d){ Object.assign(d,data); notify(`Deal updated: ${data.name}`); }
+    else { data.id=uid("deal"); data.created=todayISO(); DB.deals.push(data); notify(`New deal created: ${data.name}`); }
+    save();
+    goTo("deal-detail", {type:'deal', id:d?d.id:data.id});
+    return true;
+  });
+}
+
+/* ---------- PIPELINE (Kanban) ---------- */
+let dragDealId = null;
+function renderPipeline(c){
+  const stages = PIPELINE_STAGES;
+  c.innerHTML = `
+    <div class="pageheader">
+      <div><h1>Pipeline</h1><div class="sub">Drag a deal to move it between stages.</div></div>
+      <div class="actions"><button class="btn btn-primary" onclick="openDealForm()">+ New Deal</button></div>
+    </div>
+    <div class="kanban">
+      ${stages.map(st=>{
+        const items = DB.deals.filter(d=>d.stage===st);
+        const total = items.reduce((s,d)=>s+Number(d.amount),0);
+        return `<div class="kanban-col" data-stage="${st}" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="onDropStage(event,'${st}')">
+          <div class="kanban-col-head"><span>${st}</span><span style="color:var(--ink-soft);font-weight:400;">${items.length}</span></div>
+          <div class="kanban-col-body">
+            ${items.map(d=>`
+              <div class="kcard" draggable="true" ondragstart="dragDealId='${d.id}';this.classList.add('dragging')" ondragend="this.classList.remove('dragging')" onclick="goTo('deal-detail',{type:'deal',id:'${d.id}'})">
+                <div class="kname">${d.name}</div>
+                <div class="kamount">${fmtMoney(d.amount)}</div>
+                <div class="kmeta">${findAccount(d.account)?findAccount(d.account).name:"No account"} · ${d.probability}%</div>
+              </div>
+            `).join("")}
+            <div style="font-size:11px;color:var(--ink-soft);padding:6px 4px 0 4px;">Total: ${fmtMoney(total)}</div>
+          </div>
+        </div>`;
+      }).join("")}
+    </div>
+  `;
+}
+function onDropStage(e, stage){
+  e.currentTarget.classList.remove('dragover');
+  if(!dragDealId) return;
+  updateDealStage(dragDealId, stage);
+  dragDealId = null;
+}
+
+/* ---------- FORECAST ---------- */
+function renderForecast(c){
+  const open = DB.deals.filter(d=>!d.stage.startsWith("Closed"));
+  const total = open.reduce((s,d)=>s+Number(d.amount)*d.probability/100,0);
+  c.innerHTML = `
+    <div class="pageheader"><div><h1>Forecast</h1><div class="sub">Expected revenue = deal amount × probability, summed across open deals.</div></div></div>
+    <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
+      ${kpi("Open Deals", open.length)}
+      ${kpi("Total Pipeline", fmtMoney(open.reduce((s,d)=>s+Number(d.amount),0)))}
+      ${kpi("Forecast (Expected Revenue)", fmtMoney(Math.round(total)))}
+    </div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Deal</th><th>Amount</th><th>Probability</th><th>Expected</th><th>Closing</th></tr></thead>
+      <tbody>
+      ${open.map(d=>`<tr onclick="goTo('deal-detail',{type:'deal',id:'${d.id}'})">
+        <td><span class="rowlink">${d.name}</span></td><td>${fmtMoney(d.amount)}</td><td>${d.probability}%</td>
+        <td>${fmtMoney(Math.round(d.amount*d.probability/100))}</td><td>${d.closing?fmtDate(d.closing):"—"}</td>
+      </tr>`).join("")}
+      <tr style="font-weight:700;background:var(--paper-2);"><td colspan="3">Total forecast</td><td>${fmtMoney(Math.round(total))}</td><td></td></tr>
+      </tbody>
+    </table></div>
+  `;
+}
+
+/* ---------- ACTIVITIES (Tasks/Calls/Meetings) ---------- */
+function renderActivities(kind, c){
+  c = c || document.getElementById("content");
+  const items = DB.activities.filter(a=>a.kind===kind).sort((a,b)=> (a.done - b.done) || a.due.localeCompare(b.due));
+  c.innerHTML = `
+    <div class="pageheader">
+      <div><h1>${kind}s</h1><div class="sub">${items.filter(a=>!a.done).length} open · ${items.filter(a=>a.done).length} done</div></div>
+      <div class="actions"><button class="btn btn-primary" onclick="openActivityForm('${kind}')">+ New ${kind}</button></div>
+    </div>
+    <div class="panel">
+      ${items.length? items.map(a=>{
+        const overdue = !a.done && a.due < todayISO();
+        return `<div class="checklist-item ${a.done?'done':''}">
+          <input type="checkbox" ${a.done?'checked':''} onchange="toggleActivity('${a.id}')">
+          <div class="cltext">${a.title} <span style="color:var(--ink-soft);font-size:11.5px;">(${a.owner})</span></div>
+          <span class="cltag ${overdue?'overdue':''}">${overdue?'Overdue · ':''}${fmtDate(a.due)}</span>
+        </div>`;
+      }).join("") : `<div class="empty">No ${kind.toLowerCase()}s yet.</div>`}
+    </div>
+  `;
+}
+function toggleActivity(id){
+  const a = DB.activities.find(x=>x.id===id);
+  a.done = !a.done;
+  save(); renderView();
+}
+function openActivityForm(kind){
+  const body = `<div class="formgrid">
+    <div class="field full"><label>Title</label><input id="f_title"></div>
+    <div class="field"><label>Due date</label><input id="f_due" type="date" value="${todayISO()}"></div>
+    <div class="field"><label>Owner</label><input id="f_owner" value="${CURRENT_USER.name}"></div>
+  </div>`;
+  openModal(`New ${kind}`, body, ()=>{
+    const title = val('f_title');
+    if(!title){ toast("Please enter a title."); return false; }
+    DB.activities.push({id:uid("act"), kind, title, related:"", relatedType:"", due:val('f_due'), owner:val('f_owner'), done:false});
+    save(); notify(`New ${kind.toLowerCase()} created: ${title}`);
+    renderView();
+    return true;
+  });
+}
+function renderRelatedActivities(relatedId){
+  const items = DB.activities.filter(a=>a.related===relatedId);
+  return listOrEmpty(items.map(a=>`
+    <div class="checklist-item ${a.done?'done':''}">
+      <input type="checkbox" ${a.done?'checked':''} onchange="toggleActivity('${a.id}')">
+      <div class="cltext">${a.title}</div>
+      <span class="cltag ${(!a.done && a.due<todayISO())?'overdue':''}">${fmtDate(a.due)}</span>
+    </div>
+  `), "No linked activities yet.");
+}
+
+/* ---------- CALENDAR ---------- */
+let calMonth = new Date().getMonth();
+let calYear = new Date().getFullYear();
+function renderCalendar(c){
+  const first = new Date(calYear, calMonth, 1);
+  const startDow = first.getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const monthName = first.toLocaleDateString('en-GB',{month:'long', year:'numeric'});
+  let cells = "";
+  for(let i=0;i<startDow;i++) cells += `<div class="cal-cell muted"></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const iso = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const items = DB.activities.filter(a=>a.due===iso);
+    cells += `<div class="cal-cell"><div class="cal-daynum">${d}</div>${items.map(a=>`<div class="cal-item ${a.done?'done':''}" title="${a.title}">${a.title}</div>`).join("")}</div>`;
+  }
+  c.innerHTML = `
+    <div class="pageheader">
+      <div><h1>Calendar</h1><div class="sub">${monthName}</div></div>
+      <div class="actions">
+        <button class="btn btn-sm" onclick="calMonth--;if(calMonth<0){calMonth=11;calYear--;}renderView()">‹ Prev</button>
+        <button class="btn btn-sm" onclick="calMonth++;if(calMonth>11){calMonth=0;calYear++;}renderView()">Next ›</button>
+      </div>
+    </div>
+    <div class="calendar">
+      ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=>`<div class="cal-head">${d}</div>`).join("")}
+      ${cells}
+    </div>
+  `;
+}
+
+/* ---------- REPORTS ---------- */
+function renderReports(c){
+  const leadsBySource = {};
+  DB.leads.forEach(l=> leadsBySource[l.source]=(leadsBySource[l.source]||0)+1 );
+  const dealsByStage = {};
+  DB.deals.forEach(d=> dealsByStage[d.stage]=(dealsByStage[d.stage]||0)+1 );
+  const won = DB.deals.filter(d=>d.stage==="Closed Won");
+  const lost = DB.deals.filter(d=>d.stage==="Closed Lost");
+  const winRate = (won.length+lost.length) ? Math.round(won.length/(won.length+lost.length)*100) : 0;
+  const avgDeal = DB.deals.length ? Math.round(DB.deals.reduce((s,d)=>s+Number(d.amount),0)/DB.deals.length) : 0;
+  const maxSrc = Math.max(...Object.values(leadsBySource),1);
+  const maxStage = Math.max(...Object.values(dealsByStage),1);
+  c.innerHTML = `
+    <div class="pageheader"><div><h1>Reports</h1><div class="sub">Lead, deal and activity performance at a glance.</div></div></div>
+    <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+      ${kpi("Win Rate", winRate+"%")}
+      ${kpi("Average Deal Size", fmtMoney(avgDeal))}
+      ${kpi("Deals Won", won.length)}
+      ${kpi("Deals Lost", lost.length)}
+    </div>
+    <div class="grid-2">
+      <div class="panel"><h3>Leads by source</h3>
+        ${Object.entries(leadsBySource).map(([s,n])=>`<div class="reportbar-row"><div class="reportbar-label">${s}</div><div class="reportbar-track"><div class="reportbar-fill" style="width:${n/maxSrc*100}%"></div></div><div class="reportbar-val">${n}</div></div>`).join("")}
+      </div>
+      <div class="panel"><h3>Deals by stage</h3>
+        ${Object.entries(dealsByStage).map(([s,n])=>`<div class="reportbar-row"><div class="reportbar-label">${s}</div><div class="reportbar-track"><div class="reportbar-fill" style="width:${n/maxStage*100}%"></div></div><div class="reportbar-val">${n}</div></div>`).join("")}
+      </div>
+    </div>
+    <div class="panel"><h3>Activity summary</h3>
+      <div class="fieldsgrid">
+        <div><div class="k">Tasks completed</div><div class="v">${DB.activities.filter(a=>a.kind==='Task'&&a.done).length}</div></div>
+        <div><div class="k">Calls logged</div><div class="v">${DB.activities.filter(a=>a.kind==='Call').length}</div></div>
+        <div><div class="k">Meetings held</div><div class="v">${DB.activities.filter(a=>a.kind==='Meeting').length}</div></div>
+        <div><div class="k">Overdue activities</div><div class="v">${DB.activities.filter(a=>!a.done && a.due<todayISO()).length}</div></div>
+      </div>
+    </div>
+  `;
+}
+function renderAnalytics(c){
+  const owners = {};
+  DB.deals.forEach(d=>{ owners[d.owner]=owners[d.owner]||{count:0,value:0,won:0}; owners[d.owner].count++; owners[d.owner].value+=Number(d.amount); if(d.stage==="Closed Won") owners[d.owner].won++; });
+  c.innerHTML = `
+    <div class="pageheader"><div><h1>Team Analytics</h1><div class="sub">Performance by salesperson.</div></div></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Salesperson</th><th>Deals</th><th>Total Value</th><th>Won</th></tr></thead>
+      <tbody>${Object.entries(owners).map(([o,v])=>`<tr><td>${o}</td><td>${v.count}</td><td>${fmtMoney(v.value)}</td><td>${v.won}</td></tr>`).join("")}</tbody>
+    </table></div>
+  `;
+}
+
+/* ---------- SETTINGS ---------- */
+function renderSettings(c){
+  c.innerHTML = `
+    <div class="pageheader"><div><h1>Settings</h1><div class="sub">Core CRM configuration.</div></div></div>
+    <div class="panel">
+      <div class="settings-card"><div><div class="t">Users</div><div class="d">Manage who has access to this CRM.</div></div><button class="btn btn-sm" disabled>Manage</button></div>
+      <div class="settings-card"><div><div class="t">Roles &amp; Profiles</div><div class="d">Administrator, Sales Manager, Salesperson, Marketing, Support, Viewer.</div></div><button class="btn btn-sm" disabled>Manage</button></div>
+      <div class="settings-card"><div><div class="t">Territories</div><div class="d">Assign accounts to regions or teams.</div></div><button class="btn btn-sm" disabled>Manage</button></div>
+      <div class="settings-card"><div><div class="t">Custom Fields</div><div class="d">Add fields to Leads, Accounts, Contacts or Deals.</div></div><button class="btn btn-sm" disabled>Manage</button></div>
+      <div class="settings-card"><div><div class="t">Automation Rules</div><div class="d">e.g. "When Deal moves to Proposal → create follow-up task in 3 days."</div></div><button class="btn btn-sm" disabled>Manage</button></div>
+      <div class="settings-card"><div><div class="t">Import / Export</div><div class="d">Bring in Leads, Accounts, Contacts or Deals from CSV/Excel.</div></div><button class="btn btn-sm" disabled>Manage</button></div>
+      <div class="settings-card"><div><div class="t">Audit Log</div><div class="d">Track who changed what, and when.</div></div><button class="btn btn-sm" disabled>Manage</button></div>
+      <div class="settings-card"><div><div class="t">Clear all data</div><div class="d">Permanently delete every lead, account, contact, deal and activity for this company.</div></div><button class="btn btn-sm btn-danger" onclick="resetDemoData()">Clear data</button></div>
+    </div>
+  `;
+}
+function resetDemoData(){
+  if(!confirm("This permanently deletes all leads, accounts, contacts, deals and activities for this company. Continue?")) return;
+  DB = seedData();
+  save();
+  goTo("dashboard");
+  toast("All data cleared.");
+}
+
+/* =========================================================
+   MODAL / TOAST HELPERS
+   ========================================================= */
+function val(id){ const el=document.getElementById(id); return el? el.value.trim() : ""; }
+function openModal(title, bodyHtml, onSave, saveLabel){
+  const backdrop = document.getElementById("modalBackdrop");
+  const box = document.getElementById("modalBox");
+  box.innerHTML = `
+    <div class="modal-head"><h3>${title}</h3><button class="closebtn" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">${bodyHtml}</div>
+    <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" id="modalSaveBtn">${saveLabel||"Save"}</button></div>
+  `;
+  document.getElementById("modalSaveBtn").onclick = ()=>{ if(onSave()!==false) closeModal(); };
+  backdrop.classList.add("open");
+}
+function closeModal(){ document.getElementById("modalBackdrop").classList.remove("open"); }
+function toast(msg){
+  const wrap = document.getElementById("toastWrap");
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.textContent = msg;
+  wrap.appendChild(t);
+  setTimeout(()=>t.remove(), 3200);
+}
+
+/* ---------- Quick add ---------- */
+function openQuickAdd(){
+  openModal("Quick add", `
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button class="btn" onclick="closeModal();openLeadForm()">＋ Lead</button>
+      <button class="btn" onclick="closeModal();openAccountForm()">＋ Account</button>
+      <button class="btn" onclick="closeModal();openContactForm()">＋ Contact</button>
+      <button class="btn" onclick="closeModal();openDealForm()">＋ Deal</button>
+      <button class="btn" onclick="closeModal();openActivityForm('Task')">＋ Task</button>
+    </div>
+  `, ()=>false, "Close");
+  document.getElementById("modalSaveBtn").style.display="none";
+}
+
+/* ---------- Notifications ---------- */
+function renderNotifBadge(){
+  const unread = DB.notifications.filter(n=>!n.read).length;
+  const badge = document.getElementById("notifCount");
+  if(unread>0){ badge.style.display="flex"; badge.textContent = unread>9?"9+":unread; }
+  else badge.style.display="none";
+}
+function renderNotifPanel(){
+  const panel = document.getElementById("notifPanel");
+  panel.innerHTML = DB.notifications.length ? DB.notifications.slice(0,12).map(n=>`<div class="notif-item">${n.text}<div class="t">${n.time}</div></div>`).join("") : `<div class="notif-item">No notifications.</div>`;
+}
+
+/* ---------- Global search ---------- */
+document.addEventListener("DOMContentLoaded", checkSessionOnLoad);
+
+function checkSessionOnLoad(){
+  const session = getSession();
+  if(session){
+    const users = getUsers();
+    const user = users.find(u=>u.email===session.email && u.companyId===session.companyId);
+    if(user){ enterApp(user); return; }
+  }
+  document.getElementById('authScreen').style.display = 'flex';
+}
+
+let appInitialized = false;
+function initApp(){
+  currentView = "dashboard";
+  currentDetail = null;
+  renderNav();
+  renderView();
+  renderNotifBadge();
+
+  if(appInitialized) return;
+  appInitialized = true;
+
+  document.getElementById("quickAddBtn").onclick = openQuickAdd;
+  document.getElementById("notifBtn").onclick = (e)=>{
+    e.stopPropagation();
+    renderNotifPanel();
+    const p = document.getElementById("notifPanel");
+    p.classList.toggle("open");
+    document.getElementById("userMenuPanel").classList.remove("open");
+    DB.notifications.forEach(n=>n.read=true);
+    save(); renderNotifBadge();
+  };
+  document.addEventListener("click", (e)=>{
+    const p = document.getElementById("notifPanel");
+    if(p.classList.contains("open") && !p.contains(e.target) && e.target.id!=="notifBtn") p.classList.remove("open");
+    const um = document.getElementById("userMenuPanel");
+    if(um.classList.contains("open") && !um.contains(e.target) && e.target.id!=="userChip") um.classList.remove("open");
+  });
+  document.getElementById("menuToggle").onclick = ()=> document.getElementById("sidebar").classList.toggle("open");
+  document.getElementById("modalBackdrop").addEventListener("click", (e)=>{ if(e.target.id==="modalBackdrop") closeModal(); });
+
+  document.getElementById("globalSearch").addEventListener("input", function(){
+    const q = this.value.trim().toLowerCase();
+    if(q.length<2) return;
+    const lead = DB.leads.find(l=>l.name.toLowerCase().includes(q)||l.company.toLowerCase().includes(q));
+    const acc = DB.accounts.find(a=>a.name.toLowerCase().includes(q));
+    const deal = DB.deals.find(d=>d.name.toLowerCase().includes(q));
+    if(acc){ goTo('account-detail',{type:'account',id:acc.id}); }
+    else if(deal){ goTo('deal-detail',{type:'deal',id:deal.id}); }
+    else if(lead){ goTo('lead-detail',{type:'lead',id:lead.id}); }
+  });
+}
 </script>
 </body>
 </html>

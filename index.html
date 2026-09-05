@@ -4,8 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Acacia Books CRM</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+  (function(){
+    try{
+      var t = localStorage.getItem("acacia_theme");
+      if(t === "dark") document.documentElement.setAttribute("data-theme","dark");
+    }catch(e){}
+  })();
+</script>
 <style>
   :root{
     --forest:#16302A;
@@ -26,17 +32,39 @@
     --warn:#B98A2E;
     --radius:6px;
     --shadow:0 1px 2px rgba(28,27,22,0.06);
+    --forest-text:var(--forest-2);
+    --forest-text-strong:var(--forest);
+  }
+  html[data-theme="dark"]{
+    --paper:#141F1A;
+    --paper-2:#1B2822;
+    --card:#1E2B25;
+    --ink:#EDEAD9;
+    --ink-soft:#A9AF9E;
+    --line:#33453C;
+    --gold:#D9A441;
+    --gold-deep:#E3B75F;
+    --clay:#D98F6F;
+    --sky:#7FB8C7;
+    --good:#5FBE81;
+    --bad:#D98F6F;
+    --warn:#D9A441;
+    --shadow:0 1px 3px rgba(0,0,0,0.4);
+    --forest-text:#7FD9A8;
+    --forest-text-strong:#8FE0B4;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
+  html[data-theme="dark"] body{background:var(--paper);}
   body{
-    font-family:'IBM Plex Sans',sans-serif;
+    font-family:'Cambria', Georgia, 'Times New Roman', serif;
     background:var(--paper);
     color:var(--ink);
     font-size:14px;
     line-height:1.5;
+    transition:background .15s ease, color .15s ease;
   }
-  h1,h2,h3,.brand{font-family:'Fraunces',serif;}
+  h1,h2,h3,.brand{font-family:'Cambria', Georgia, 'Times New Roman', serif;}
   a{color:inherit;}
   button{font-family:inherit;font-size:inherit;cursor:pointer;}
   input,select,textarea{font-family:inherit;font-size:inherit;}
@@ -215,7 +243,7 @@
     padding:16px 16px 14px 16px;
   }
   .kpi .label{font-size:11.5px;color:var(--ink-soft);letter-spacing:0.2px;margin-bottom:6px;}
-  .kpi .value{font-size:24px;font-weight:600;font-family:'Fraunces',serif;}
+  .kpi .value{font-size:24px;font-weight:600;font-family:'Cambria', Georgia, 'Times New Roman', serif;}
   .kpi .delta{font-size:11.5px;margin-top:4px;}
   .kpi .delta.up{color:var(--good);}
   .kpi .delta.down{color:var(--bad);}
@@ -266,7 +294,7 @@
   .tabletoolbar input,.tabletoolbar select{
     padding:7px 10px;border:1px solid var(--line);border-radius:var(--radius);background:var(--card);
   }
-  .rowlink{color:var(--forest-2);font-weight:600;}
+  .rowlink{color:var(--forest-text);font-weight:600;}
   .rowlink:hover{text-decoration:underline;}
 
   .pill{
@@ -286,7 +314,7 @@
 
   .avatarsm{
     width:26px;height:26px;border-radius:50%;flex-shrink:0;
-    background:var(--paper-2);color:var(--forest-2);
+    background:var(--paper-2);color:var(--forest-text);
     display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;
   }
 
@@ -309,7 +337,7 @@
   }
   .kcard.dragging{opacity:0.4;}
   .kcard .kname{font-weight:600;font-size:13px;margin-bottom:3px;}
-  .kcard .kamount{font-size:13px;color:var(--forest-2);font-weight:700;font-family:'Fraunces',serif;}
+  .kcard .kamount{font-size:13px;color:var(--forest-text);font-weight:700;font-family:'Cambria', Georgia, 'Times New Roman', serif;}
   .kcard .kmeta{font-size:11px;color:var(--ink-soft);margin-top:4px;}
   .kanban-col.dragover{outline:2px dashed var(--gold);outline-offset:-4px;}
 
@@ -319,7 +347,7 @@
     padding:9px 14px;font-size:13px;font-weight:600;color:var(--ink-soft);
     border-bottom:2px solid transparent;cursor:pointer;
   }
-  .tab.active{color:var(--forest);border-bottom-color:var(--gold);}
+  .tab.active{color:var(--forest-text-strong);border-bottom-color:var(--gold);}
 
   /* Timeline */
   .timeline{border-left:2px solid var(--line);margin-left:8px;padding-left:18px;}
@@ -451,7 +479,7 @@
   @media(max-width:760px){ .auth-form-panel{padding:30px 28px;} }
   .auth-tabs{display:flex;gap:4px;margin-bottom:22px;background:var(--paper);border-radius:8px;padding:4px;}
   .auth-tab{flex:1;text-align:center;padding:8px 0;border-radius:6px;font-size:13px;font-weight:600;color:var(--ink-soft);cursor:pointer;}
-  .auth-tab.active{background:var(--card);color:var(--forest);box-shadow:var(--shadow);}
+  .auth-tab.active{background:var(--card);color:var(--forest-text-strong);box-shadow:var(--shadow);}
   .auth-form-panel h2{margin:0 0 4px 0;font-size:20px;}
   .auth-form-panel .sub{color:var(--ink-soft);font-size:12.5px;margin-bottom:20px;}
   .auth-field{margin-bottom:13px;}
@@ -467,7 +495,7 @@
   .auth-error.show{display:block;}
   .auth-submit{width:100%;padding:11px 0;margin-top:6px;font-size:13.5px;}
   .auth-switch{font-size:12.5px;color:var(--ink-soft);text-align:center;margin-top:16px;}
-  .auth-switch a{color:var(--forest-2);font-weight:600;cursor:pointer;text-decoration:none;}
+  .auth-switch a{color:var(--forest-text);font-weight:600;cursor:pointer;text-decoration:none;}
   .auth-switch a:hover{text-decoration:underline;}
   #app{display:none;}
   #app.ready{display:flex;}
@@ -552,13 +580,19 @@
       <div class="search"><input id="globalSearch" placeholder="Search leads, accounts, deals..." /></div>
       <div class="spacer"></div>
       <button class="btn btn-gold btn-sm" id="quickAddBtn">+ New</button>
+      <button class="iconbtn themetoggle" id="themeToggle" aria-label="Toggle dark mode" onclick="toggleTheme()">
+        <span class="ico-light">🌙</span><span class="ico-dark">☀️</span>
+      </button>
       <div style="position:relative;">
         <button class="iconbtn" id="notifBtn" aria-label="Notifications">🔔<span class="badge" id="notifCount" style="display:none;"></span></button>
         <div class="notif-panel" id="notifPanel"></div>
       </div>
       <div class="userchip" id="userChip" onclick="toggleUserMenu(event)" style="cursor:pointer;position:relative;">
         <div class="avatar" id="userAvatar">–</div>
-        <span style="font-size:12.5px;font-weight:600;" id="userNameLabel">–</span>
+        <span style="display:flex;flex-direction:column;line-height:1.25;">
+          <span style="font-size:12.5px;font-weight:600;" id="userNameLabel">–</span>
+          <span style="font-size:10.5px;color:var(--ink-soft);" id="userRoleLabel"></span>
+        </span>
         <div class="notif-panel" id="userMenuPanel" style="right:0;left:auto;width:160px;">
           <div class="notif-item" style="cursor:pointer;" onclick="handleLogout()">Log out</div>
         </div>
@@ -579,6 +613,19 @@
    ACACIA BOOKS CRM — single-file app
    Data persists to localStorage under "acaciaCrmData"
    ========================================================= */
+
+/* ---------- Theme (dark mode) ---------- */
+const THEME_KEY = "acacia_theme";
+function toggleTheme(){
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+  if(isDark){
+    document.documentElement.removeAttribute("data-theme");
+    try{ localStorage.setItem(THEME_KEY, "light"); }catch(e){}
+  }else{
+    document.documentElement.setAttribute("data-theme", "dark");
+    try{ localStorage.setItem(THEME_KEY, "dark"); }catch(e){}
+  }
+}
 
 const USERS_KEY = "acaciaCrmUsers";
 const SESSION_KEY = "acaciaCrmSession";
@@ -650,7 +697,7 @@ function handleRegister(){
   const users = getUsers();
   if(users.some(u=>u.email===email)){ showAuthError('registerError','An account with that email already exists.'); return; }
   const companyId = uid('co');
-  const user = {companyId, company, name, email, password};
+  const user = {companyId, company, name, email, password, role:"Administrator"};
   users.push(user);
   saveUsers(users);
   setSession(user);
@@ -685,12 +732,14 @@ function toggleUserMenu(e){
 }
 
 function enterApp(user){
+  if(!user.role) user.role = "Administrator";
   CURRENT_USER = user;
   DB = load(user.companyId);
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('app').classList.add('ready');
   document.getElementById('userAvatar').textContent = initials(user.name) || 'U';
   document.getElementById('userNameLabel').textContent = user.name;
+  document.getElementById('userRoleLabel').textContent = user.role || "Administrator";
   initApp();
 }
 
@@ -903,7 +952,8 @@ function listOrEmpty(rows,emptyText){
 /* ---------- LEADS ---------- */
 let leadFilters = {status:"", search:""};
 function renderLeads(c){
-  const rows = DB.leads.filter(l=>{
+  const base = scopeOwn(DB.leads);
+  const rows = base.filter(l=>{
     if(leadFilters.status && l.status!==leadFilters.status) return false;
     if(leadFilters.search){
       const s = leadFilters.search.toLowerCase();
@@ -913,8 +963,8 @@ function renderLeads(c){
   });
   c.innerHTML = `
     <div class="pageheader">
-      <div><h1>Leads</h1><div class="sub">${DB.leads.length} total leads · ${DB.leads.filter(l=>l.status==="New").length} new</div></div>
-      <div class="actions"><button class="btn btn-primary" onclick="openLeadForm()">+ New Lead</button></div>
+      <div><h1>Leads</h1><div class="sub">${base.length} total leads · ${base.filter(l=>l.status==="New").length} new</div></div>
+      <div class="actions">${canManage('leads') ? `<button class="btn btn-primary" onclick="openLeadForm()">+ New Lead</button>` : ``}</div>
     </div>
     <div class="tabletoolbar">
       <input id="leadSearchInput" placeholder="Search name or company..." value="${leadFilters.search}" oninput="leadFilters.search=this.value;renderLeads(document.getElementById('content'))">
@@ -936,7 +986,7 @@ function renderLeads(c){
             <td><span class="pill score-${scoreLabel(l.score)}">${l.score} · ${scoreLabelText(l.score)}</span></td>
             <td>${l.owner}</td>
             <td>${l.nextFollowup?fmtDate(l.nextFollowup):"—"}</td>
-            <td onclick="event.stopPropagation()"><button class="btn btn-sm" onclick="openLeadForm('${l.id}')">Edit</button></td>
+            <td onclick="event.stopPropagation()">${canManage('leads') ? `<button class="btn btn-sm" onclick="openLeadForm('${l.id}')">Edit</button>` : ``}</td>
           </tr>
         `).join("") : `<tr><td colspan="8"><div class="empty">No leads match this filter.</div></td></tr>`}
         </tbody>
@@ -1063,7 +1113,7 @@ function renderLeadScoring(c){
       <div class="panel">
         <h3>Scoring rules</h3>
         ${[["Opened email","+5"],["Clicked email","+10"],["Visited website","+10"],["Requested demo","+25"],["Completed form","+15"],["Company size > 50 staff","+10"],["No activity for 30 days","−10"]].map(r=>`
-          <div class="listrow"><div class="main"><div class="title">${r[0]}</div></div><div style="font-weight:700;color:var(--forest-2)">${r[1]}</div></div>
+          <div class="listrow"><div class="main"><div class="title">${r[0]}</div></div><div style="font-weight:700;color:var(--forest-text)">${r[1]}</div></div>
         `).join("")}
       </div>
       <div class="panel">
@@ -1079,16 +1129,17 @@ function renderLeadScoring(c){
 
 /* ---------- ACCOUNTS ---------- */
 function renderAccounts(c){
+  const rows = scopeOwn(DB.accounts);
   c.innerHTML = `
     <div class="pageheader">
-      <div><h1>Accounts</h1><div class="sub">${DB.accounts.length} accounts</div></div>
-      <div class="actions"><button class="btn btn-primary" onclick="openAccountForm()">+ New Account</button></div>
+      <div><h1>Accounts</h1><div class="sub">${rows.length} accounts</div></div>
+      <div class="actions">${canManage('accounts') ? `<button class="btn btn-primary" onclick="openAccountForm()">+ New Account</button>` : ``}</div>
     </div>
     <div class="tablewrap">
       <table>
         <thead><tr><th>Account</th><th>Industry</th><th>Owner</th><th>Type</th><th>Contacts</th><th>Open Deals</th><th>Status</th></tr></thead>
         <tbody>
-        ${DB.accounts.map(a=>`
+        ${rows.map(a=>`
           <tr onclick="goTo('account-detail',{type:'account',id:'${a.id}'})">
             <td><span class="rowlink">${a.name}</span></td>
             <td>${a.industry||"—"}</td>
@@ -1118,7 +1169,7 @@ function renderAccountDetail(c){
     <div class="detail-header">
       <div class="top">
         <div><h2>${a.name}</h2><div class="sub2">${a.industry||"—"} · ${a.country||""} · Owner: ${a.owner}</div></div>
-        <div class="actions"><button class="btn btn-sm" onclick="openAccountForm('${a.id}')">Edit</button></div>
+        <div class="actions">${canManage('accounts') ? `<button class="btn btn-sm" onclick="openAccountForm('${a.id}')">Edit</button>` : ``}</div>
       </div>
     </div>
     <div class="tabs">${tabs.map(t=>`<div class="tab ${accountDetailTab===t?'active':''}" onclick="accountDetailTab='${t}';renderView()">${t.charAt(0).toUpperCase()+t.slice(1)}</div>`).join("")}</div>
@@ -1181,15 +1232,16 @@ function openAccountForm(id){
 
 /* ---------- CONTACTS ---------- */
 function renderContacts(c){
+  const rows = scopeOwn(DB.contacts);
   c.innerHTML = `
     <div class="pageheader">
-      <div><h1>Contacts</h1><div class="sub">${DB.contacts.length} contacts</div></div>
-      <div class="actions"><button class="btn btn-primary" onclick="openContactForm()">+ New Contact</button></div>
+      <div><h1>Contacts</h1><div class="sub">${rows.length} contacts</div></div>
+      <div class="actions">${canManage('contacts') ? `<button class="btn btn-primary" onclick="openContactForm()">+ New Contact</button>` : ``}</div>
     </div>
     <div class="tablewrap"><table>
       <thead><tr><th>Name</th><th>Title</th><th>Account</th><th>Email</th><th>Phone</th><th>Owner</th></tr></thead>
       <tbody>
-      ${DB.contacts.map(ct=>{
+      ${rows.map(ct=>{
         const acc = findAccount(ct.account);
         return `<tr onclick="${acc?`goTo('account-detail',{type:'account',id:'${acc.id}'})`:''}">
           <td><div style="display:flex;align-items:center;gap:8px;"><div class="avatarsm">${initials(ct.first+' '+ct.last)}</div>${ct.first} ${ct.last}</div></td>
@@ -1227,15 +1279,16 @@ function openContactForm(){
 
 /* ---------- DEALS (list) ---------- */
 function renderDealsList(c){
+  const rows = scopeOwn(DB.deals);
   c.innerHTML = `
     <div class="pageheader">
-      <div><h1>Deals</h1><div class="sub">${DB.deals.length} deals · ${fmtMoney(DB.deals.filter(d=>!d.stage.startsWith('Closed')).reduce((s,d)=>s+Number(d.amount),0))} open pipeline</div></div>
-      <div class="actions"><button class="btn" onclick="goTo('pipeline')">View pipeline</button><button class="btn btn-primary" onclick="openDealForm()">+ New Deal</button></div>
+      <div><h1>Deals</h1><div class="sub">${rows.length} deals · ${fmtMoney(rows.filter(d=>!d.stage.startsWith('Closed')).reduce((s,d)=>s+Number(d.amount),0))} open pipeline</div></div>
+      <div class="actions"><button class="btn" onclick="goTo('pipeline')">View pipeline</button>${canManage('deals') ? `<button class="btn btn-primary" onclick="openDealForm()">+ New Deal</button>` : ``}</div>
     </div>
     <div class="tablewrap"><table>
       <thead><tr><th>Deal</th><th>Account</th><th>Amount</th><th>Stage</th><th>Probability</th><th>Closing</th><th>Owner</th></tr></thead>
       <tbody>
-      ${DB.deals.map(d=>{
+      ${rows.map(d=>{
         const acc = findAccount(d.account);
         return `<tr onclick="goTo('deal-detail',{type:'deal',id:'${d.id}'})">
           <td><span class="rowlink">${d.name}</span></td>
@@ -1263,10 +1316,10 @@ function renderDealDetail(c){
       <div class="top">
         <div><h2>${d.name}</h2><div class="sub2">${fmtMoney(d.amount)} · <span class="pill status-Qualified">${d.stage}</span> · ${d.probability}% probability</div></div>
         <div class="actions">
-          <select onchange="updateDealStage('${d.id}',this.value)" class="btn btn-sm" style="border:1px solid var(--line)">
+          <select onchange="updateDealStage('${d.id}',this.value)" class="btn btn-sm" style="border:1px solid var(--line)" ${canManage('deals')?'':'disabled'}>
             ${PIPELINE_STAGES.map(s=>`<option ${s===d.stage?"selected":""}>${s}</option>`).join("")}
           </select>
-          <button class="btn btn-sm" onclick="openDealForm('${d.id}')">Edit</button>
+          <button class="btn btn-sm" onclick="openDealForm('${d.id}')" ${canManage('deals')?'':'disabled'}>Edit</button>
         </div>
       </div>
       <div class="fieldsgrid">
@@ -1393,17 +1446,17 @@ function renderForecast(c){
 /* ---------- ACTIVITIES (Tasks/Calls/Meetings) ---------- */
 function renderActivities(kind, c){
   c = c || document.getElementById("content");
-  const items = DB.activities.filter(a=>a.kind===kind).sort((a,b)=> (a.done - b.done) || a.due.localeCompare(b.due));
+  const items = scopeOwn(DB.activities.filter(a=>a.kind===kind)).sort((a,b)=> (a.done - b.done) || a.due.localeCompare(b.due));
   c.innerHTML = `
     <div class="pageheader">
       <div><h1>${kind}s</h1><div class="sub">${items.filter(a=>!a.done).length} open · ${items.filter(a=>a.done).length} done</div></div>
-      <div class="actions"><button class="btn btn-primary" onclick="openActivityForm('${kind}')">+ New ${kind}</button></div>
+      <div class="actions">${canManage('activities') ? `<button class="btn btn-primary" onclick="openActivityForm('${kind}')">+ New ${kind}</button>` : ``}</div>
     </div>
     <div class="panel">
       ${items.length? items.map(a=>{
         const overdue = !a.done && a.due < todayISO();
         return `<div class="checklist-item ${a.done?'done':''}">
-          <input type="checkbox" ${a.done?'checked':''} onchange="toggleActivity('${a.id}')">
+          <input type="checkbox" ${a.done?'checked':''} onchange="toggleActivity('${a.id}')" ${canManage('activities')?'':'disabled'}>
           <div class="cltext">${a.title} <span style="color:var(--ink-soft);font-size:11.5px;">(${a.owner})</span></div>
           <span class="cltag ${overdue?'overdue':''}">${overdue?'Overdue · ':''}${fmtDate(a.due)}</span>
         </div>`;
@@ -1661,7 +1714,7 @@ function initApp(){
   .pill.q-Expired{background:#F1EBD9;color:var(--gold-deep);}
   .qtotals{margin-left:auto;width:280px;max-width:100%;}
   .qtotals .row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px dashed var(--line);}
-  .qtotals .row.grand{border-bottom:none;font-weight:700;font-size:15px;font-family:'Fraunces',serif;color:var(--forest);}
+  .qtotals .row.grand{border-bottom:none;font-weight:700;font-size:15px;font-family:'Cambria', Georgia, 'Times New Roman', serif;color:var(--forest-text-strong);}
   .lineitem{display:grid;grid-template-columns:2fr 70px 110px 80px 90px 34px;gap:8px;align-items:center;margin-bottom:8px;}
   .lineitem input,.lineitem select{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);}
   .lineitem .li-total{font-weight:600;text-align:right;font-size:12.5px;}
@@ -1686,6 +1739,34 @@ function initApp(){
     body{background:#fff;}
     .panel{box-shadow:none;border:1px solid #ccc;}
   }
+
+  /* ===== Dark mode chip/pill overrides (base rules use light-only hex) ===== */
+  html[data-theme="dark"] .pill.status-New,
+  html[data-theme="dark"] .pill.q-Draft{background:rgba(127,217,168,0.14);color:#8FD6B4;}
+  html[data-theme="dark"] .pill.status-Contacted,
+  html[data-theme="dark"] .pill.q-Sent{background:rgba(127,184,199,0.16);color:#A7D6E2;}
+  html[data-theme="dark"] .pill.status-Qualified{background:rgba(95,190,129,0.16);color:#A6E0BB;}
+  html[data-theme="dark"] .pill.status-Unqualified,
+  html[data-theme="dark"] .pill.status-Lost,
+  html[data-theme="dark"] .pill.q-Declined{background:rgba(217,143,111,0.16);color:#E3A78D;}
+  html[data-theme="dark"] .pill.status-Nurturing,
+  html[data-theme="dark"] .pill.score-Warm,
+  html[data-theme="dark"] .pill.q-Expired{background:rgba(217,164,65,0.16);color:#F0C878;}
+  html[data-theme="dark"] .pill.status-Converted,
+  html[data-theme="dark"] .pill.q-Accepted{background:rgba(95,190,129,0.2);color:#A6E0BB;}
+  html[data-theme="dark"] .pill.score-Cold{background:rgba(140,160,217,0.16);color:#B7C4EE;}
+  html[data-theme="dark"] .pill.score-Hot{background:rgba(217,143,111,0.2);color:#F0B79A;}
+  html[data-theme="dark"] .pill.score-VeryHot{background:rgba(217,110,70,0.24);color:#F5A67E;}
+  html[data-theme="dark"] .auth-error{background:rgba(217,143,111,0.14);}
+  html[data-theme="dark"] .kanban-col.dragover{outline-color:var(--gold);}
+  html[data-theme="dark"] input::placeholder,
+  html[data-theme="dark"] textarea::placeholder{color:var(--ink-soft);opacity:0.7;}
+
+  /* Theme toggle button */
+  .themetoggle{position:relative;}
+  .themetoggle .ico-dark{display:none;}
+  html[data-theme="dark"] .themetoggle .ico-light{display:none;}
+  html[data-theme="dark"] .themetoggle .ico-dark{display:inline;}
 </style>
 
 <div class="palette-back" id="paletteBack">
@@ -1778,6 +1859,7 @@ function renderView(){
    PRODUCTS
    ========================================================= */
 function renderProducts(c){
+  const canEdit = canManage('products');
   const rows = DB.products.map(p=>`
     <tr>
       <td><span class="rowlink" onclick="openProductForm('${p.id}')">${esc(p.name)}</span></td>
@@ -1786,14 +1868,14 @@ function renderProducts(c){
       <td>${fmtMoney(p.price)}</td>
       <td>${p.unit||"unit"}</td>
       <td><span class="pill ${p.active===false?"status-Unqualified":"status-Qualified"}">${p.active===false?"Inactive":"Active"}</span></td>
-      <td style="text-align:right;"><button class="btn btn-sm" onclick="openProductForm('${p.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteProduct('${p.id}')">Delete</button></td>
+      <td style="text-align:right;">${canEdit ? `<button class="btn btn-sm" onclick="openProductForm('${p.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteProduct('${p.id}')">Delete</button>` : ``}</td>
     </tr>`).join("");
   c.innerHTML = `
     <div class="pageheader">
       <div><h1>Products &amp; Services</h1><div class="sub">${DB.products.length} items in your catalogue — used to build quotations.</div></div>
       <div class="actions">
         <button class="btn" onclick="exportCSV('products')">Export CSV</button>
-        <button class="btn btn-primary" onclick="openProductForm()">+ New Product</button>
+        ${canEdit ? `<button class="btn btn-primary" onclick="openProductForm()">+ New Product</button>` : ``}
       </div>
     </div>
     ${DB.products.length ? `<div class="tablewrap"><table>
@@ -1853,7 +1935,7 @@ function effectiveQuoteStatus(q){
 }
 
 function renderQuotes(c){
-  const list = [...DB.quotes].sort((a,b)=> (b.date||"").localeCompare(a.date||""));
+  const list = scopeOwn([...DB.quotes]).sort((a,b)=> (b.date||"").localeCompare(a.date||""));
   const totalValue = list.reduce((s,q)=> s + quoteTotals(q).total, 0);
   const accepted = list.filter(q=>q.status==="Accepted");
   c.innerHTML = `
@@ -1861,7 +1943,7 @@ function renderQuotes(c){
       <div><h1>Quotations</h1><div class="sub">${list.length} quotations · ${fmtMoney(Math.round(totalValue))} quoted</div></div>
       <div class="actions">
         <button class="btn" onclick="exportCSV('quotes')">Export CSV</button>
-        <button class="btn btn-primary" onclick="openQuoteForm()">+ New Quotation</button>
+        ${canManage('quotes') ? `<button class="btn btn-primary" onclick="openQuoteForm()">+ New Quotation</button>` : ``}
       </div>
     </div>
     <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
@@ -2280,10 +2362,14 @@ function renderSettings(c){
     <div class="pageheader"><div><h1>Settings</h1><div class="sub">Company preferences, data import/export and backups.</div></div></div>
     <div class="panel">
       <h3>Company</h3>
-      <div class="settings-card"><div><div class="t">${esc(CURRENT_USER.company)}</div><div class="d">Signed in as ${esc(CURRENT_USER.name)} · ${esc(CURRENT_USER.email)}</div></div></div>
+      <div class="settings-card"><div><div class="t">${esc(CURRENT_USER.company)}</div><div class="d">Signed in as ${esc(CURRENT_USER.name)} · ${esc(CURRENT_USER.email)} · ${esc(currentRole())}</div></div></div>
       <div class="settings-card"><div><div class="t">Monthly revenue target</div><div class="d">${DB.settings.monthlyTarget?fmtMoney(DB.settings.monthlyTarget):"Not set yet"} — drives the Sales Targets page.</div></div><button class="btn btn-sm" onclick="editTarget()">Edit</button></div>
       <div class="settings-card"><div><div class="t">Quoting defaults</div><div class="d">Tax ${DB.settings.taxRate||0}% · quotes valid ${DB.settings.quoteValidityDays||30} days.</div></div><button class="btn btn-sm" onclick="editTarget()">Edit</button></div>
     </div>
+    ${isAdmin() ? `<div class="panel">
+      <h3>Team</h3>
+      <div class="settings-card"><div><div class="t">Users &amp; roles</div><div class="d">${companyUsers().length} teammate${companyUsers().length===1?"":"s"} · Administrator, Sales Manager, Salesperson, Marketing, Support, Viewer.</div></div><button class="btn btn-sm btn-primary" onclick="goTo('users-roles')">Manage</button></div>
+    </div>` : ``}
     <div class="panel">
       <h3>Data</h3>
       <div class="settings-card"><div><div class="t">Import from CSV</div><div class="d">Bring in leads, accounts, contacts or products. Templates included.</div></div><button class="btn btn-sm btn-primary" onclick="openImport()">Import</button></div>
@@ -2292,12 +2378,13 @@ function renderSettings(c){
           ${["leads","accounts","contacts","deals","products","quotes","activities"].map(k=>`<button class="btn btn-sm" onclick="exportCSV('${k}')">${k}</button>`).join("")}
         </div></div>
       <div class="settings-card"><div><div class="t">Full backup</div><div class="d">Download every record as one JSON file.</div></div><button class="btn btn-sm" onclick="backupJSON()">Backup</button></div>
+      ${isAdmin() ? `
       <div class="settings-card"><div><div class="t">Restore backup</div><div class="d">Replace current data with a backup file.</div></div><button class="btn btn-sm" onclick="openRestore()">Restore</button></div>
-      <div class="settings-card"><div><div class="t">Clear all data</div><div class="d">Permanently delete every record for this company.</div></div><button class="btn btn-sm btn-danger" onclick="resetDemoData()">Clear data</button></div>
+      <div class="settings-card"><div><div class="t">Clear all data</div><div class="d">Permanently delete every record for this company.</div></div><button class="btn btn-sm btn-danger" onclick="resetDemoData()">Clear data</button></div>` : `
+      <div class="settings-card"><div><div class="t">Restore backup &amp; clear data</div><div class="d">Administrator only.</div></div></div>`}
     </div>
     <div class="panel">
       <h3>Coming from the roadmap</h3>
-      <div class="settings-card"><div><div class="t">Users &amp; roles</div><div class="d">Administrator, Sales Manager, Salesperson, Marketing, Support, Viewer.</div></div><button class="btn btn-sm" disabled>Planned</button></div>
       <div class="settings-card"><div><div class="t">Automation rules</div><div class="d">e.g. "Deal moves to Proposal → create follow-up task in 3 days."</div></div><button class="btn btn-sm" disabled>Planned</button></div>
       <div class="settings-card"><div><div class="t">Custom fields &amp; territories</div><div class="d">Extend records and assign accounts to regions.</div></div><button class="btn btn-sm" disabled>Planned</button></div>
     </div>
@@ -2384,16 +2471,230 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
 /* ---------- Quick add (extended) ---------- */
 function openQuickAdd(){
+  const items = [
+    {type:"leads", html:`<button class="btn" onclick="closeModal();openLeadForm()">＋ Lead</button>`},
+    {type:"accounts", html:`<button class="btn" onclick="closeModal();openAccountForm()">＋ Account</button>`},
+    {type:"contacts", html:`<button class="btn" onclick="closeModal();openContactForm()">＋ Contact</button>`},
+    {type:"deals", html:`<button class="btn" onclick="closeModal();openDealForm()">＋ Deal</button>`},
+    {type:"products", html:`<button class="btn" onclick="closeModal();openProductForm()">＋ Product</button>`},
+    {type:"quotes", html:`<button class="btn btn-gold" onclick="closeModal();openQuoteForm()">＋ Quotation</button>`},
+    {type:"activities", html:`<button class="btn" onclick="closeModal();openActivityForm('Task')">＋ Task</button>`}
+  ].filter(i=>canManage(i.type)).map(i=>i.html).join("");
   openModal("Quick add", `
     <div style="display:flex;flex-direction:column;gap:8px;">
-      <button class="btn" onclick="closeModal();openLeadForm()">＋ Lead</button>
-      <button class="btn" onclick="closeModal();openAccountForm()">＋ Account</button>
-      <button class="btn" onclick="closeModal();openContactForm()">＋ Contact</button>
-      <button class="btn" onclick="closeModal();openDealForm()">＋ Deal</button>
-      <button class="btn" onclick="closeModal();openProductForm()">＋ Product</button>
-      <button class="btn btn-gold" onclick="closeModal();openQuoteForm()">＋ Quotation</button>
-      <button class="btn" onclick="closeModal();openActivityForm('Task')">＋ Task</button>
+      ${items || `<div class="empty">Your role doesn't have anything to add here.</div>`}
     </div>`, ()=>true, "Close");
+}
+
+/* =========================================================
+   USERS & ROLES
+   Roles: Administrator, Sales Manager, Salesperson, Marketing, Support, Viewer.
+   ========================================================= */
+const ROLES = ["Administrator","Sales Manager","Salesperson","Marketing","Support","Viewer"];
+
+// Which record types each role can create/edit/delete.
+const ROLE_MANAGE = {
+  "Administrator": ["leads","accounts","contacts","deals","products","quotes","activities","settings","users"],
+  "Sales Manager": ["leads","accounts","contacts","deals","products","quotes","activities","settings"],
+  "Salesperson":   ["leads","accounts","contacts","deals","products","quotes","activities"],
+  "Marketing":     ["leads","activities"],
+  "Support":       ["accounts","contacts","activities"],
+  "Viewer":        []
+};
+// Which nav destinations each role can open. Missing role or "null" list = everything.
+const ROLE_NAV = {
+  "Sales Manager": ["dashboard","leads","lead-sources","lead-scoring","accounts","contacts","deals","pipeline","forecast","products","quotes","targets","tasks","calls","meetings","calendar","reports","analytics","settings"],
+  "Salesperson":   ["dashboard","leads","lead-sources","lead-scoring","accounts","contacts","deals","pipeline","forecast","products","quotes","tasks","calls","meetings","calendar"],
+  "Marketing":     ["dashboard","leads","lead-sources","lead-scoring","reports","analytics"],
+  "Support":       ["dashboard","accounts","contacts","tasks","calls","meetings","calendar"]
+};
+const NAV_DETAIL_BASE = {"lead-detail":"leads","account-detail":"accounts","deal-detail":"deals","quote-detail":"quotes"};
+
+function currentRole(){ return (CURRENT_USER && CURRENT_USER.role) || "Administrator"; }
+function isAdmin(){ return currentRole() === "Administrator"; }
+function canManage(type){
+  const list = ROLE_MANAGE[currentRole()];
+  return !!(list && list.includes(type));
+}
+function navAllowed(viewId){
+  if(viewId === "users-roles") return isAdmin();
+  const base = NAV_DETAIL_BASE[viewId] || viewId;
+  const list = ROLE_NAV[currentRole()];
+  if(!list) return true; // Administrator & Viewer see every page
+  return list.includes(base);
+}
+function scopeOwn(list){
+  if(currentRole() === "Salesperson" && CURRENT_USER) return list.filter(r=>r.owner===CURRENT_USER.name);
+  return list;
+}
+
+/* ---------- Nav + routing overrides (role-aware) ---------- */
+(function extendNavRoles(){
+  const settingsGroup = NAV.find(s=>s.group==="Settings");
+  if(settingsGroup && !settingsGroup.items.some(i=>i.id==="users-roles")){
+    settingsGroup.items.push({id:"users-roles", label:"Users & Roles"});
+  }
+})();
+
+function renderNav(){
+  const el = document.getElementById("navlist");
+  el.innerHTML = "";
+  NAV.forEach(sec=>{
+    const visible = sec.items.filter(it=>navAllowed(it.id));
+    if(!visible.length) return;
+    const g = document.createElement("div");
+    g.className = "navgroup";
+    if(sec.group){
+      const lab = document.createElement("div");
+      lab.className = "navgroup-label";
+      lab.textContent = sec.group.toUpperCase();
+      g.appendChild(lab);
+    }
+    visible.forEach(it=>{
+      const d = document.createElement("div");
+      d.className = "navitem" + (currentView===it.id ? " active":"");
+      d.innerHTML = `<span class="dot"></span>${it.label}`;
+      d.onclick = ()=>{ goTo(it.id); if(window.innerWidth<=840) document.getElementById("sidebar").classList.remove("open"); };
+      g.appendChild(d);
+    });
+    el.appendChild(g);
+  });
+  const qa = document.getElementById("quickAddBtn");
+  if(qa) qa.style.display = currentRole()==="Viewer" ? "none" : "";
+}
+
+function goTo(viewId, detail){
+  if(!navAllowed(viewId)){
+    toast("Your role doesn't have access to that page.");
+    viewId = "dashboard"; detail = null;
+  }
+  currentView = viewId;
+  currentDetail = detail || null;
+  renderNav();
+  renderView();
+  document.getElementById("content").scrollTop = 0;
+  window.scrollTo(0,0);
+}
+
+function renderView(){
+  const c = document.getElementById("content");
+  const map = {
+    dashboard: renderDashboard,
+    leads: renderLeads,
+    "lead-sources": renderLeadSources,
+    "lead-scoring": renderLeadScoring,
+    accounts: renderAccounts,
+    "account-detail": renderAccountDetail,
+    contacts: renderContacts,
+    deals: renderDealsList,
+    "deal-detail": renderDealDetail,
+    pipeline: renderPipeline,
+    forecast: renderForecast,
+    products: renderProducts,
+    quotes: renderQuotes,
+    "quote-detail": renderQuoteDetail,
+    targets: renderTargets,
+    tasks: ()=>renderActivities("Task"),
+    calls: ()=>renderActivities("Call"),
+    meetings: ()=>renderActivities("Meeting"),
+    calendar: renderCalendar,
+    reports: renderReports,
+    analytics: renderAnalytics,
+    settings: renderSettings,
+    "lead-detail": renderLeadDetail,
+    "users-roles": renderUsersRoles
+  };
+  const fn = map[currentView] || renderDashboard;
+  c.innerHTML = "";
+  fn(c);
+}
+
+function companyUsers(){
+  return getUsers().filter(u=>u.companyId===CURRENT_USER.companyId);
+}
+function renderUsersRoles(c){
+  if(!isAdmin()){ c.innerHTML = `<div class="empty">You don't have access to this page.</div>`; return; }
+  const users = companyUsers();
+  c.innerHTML = `
+    <div class="pageheader">
+      <div><h1>Users &amp; Roles</h1><div class="sub">${users.length} teammate${users.length===1?"":"s"} on ${esc(CURRENT_USER.company)}.</div></div>
+      <div class="actions"><button class="btn btn-primary" onclick="openUserForm()">+ Add teammate</button></div>
+    </div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead>
+      <tbody>
+      ${users.map(u=>{
+        const role = u.role || "Administrator";
+        const isSelf = u.email === CURRENT_USER.email;
+        return `<tr>
+          <td>${esc(u.name)}${isSelf?' <span class="pill status-Converted">You</span>':''}</td>
+          <td>${esc(u.email)}</td>
+          <td><select onchange="changeUserRole('${esc(u.email)}',this.value)">${ROLES.map(r=>`<option ${r===role?"selected":""}>${r}</option>`).join("")}</select></td>
+          <td onclick="event.stopPropagation()">${isSelf?'':`<button class="btn btn-sm btn-danger" onclick="removeUser('${esc(u.email)}')">Remove</button>`}</td>
+        </tr>`;
+      }).join("")}
+      </tbody>
+    </table></div>
+    <div class="panel">
+      <h3>What each role can do</h3>
+      <div class="settings-card"><div><div class="t">Administrator</div><div class="d">Full access, including data, backups and Users &amp; Roles.</div></div></div>
+      <div class="settings-card"><div><div class="t">Sales Manager</div><div class="d">Full sales access across the whole team, plus Settings — cannot manage users.</div></div></div>
+      <div class="settings-card"><div><div class="t">Salesperson</div><div class="d">Sales tools scoped to their own leads, accounts, contacts, deals, quotes and activities.</div></div></div>
+      <div class="settings-card"><div><div class="t">Marketing</div><div class="d">Leads, lead sources and lead scoring, plus Reports and Analytics.</div></div></div>
+      <div class="settings-card"><div><div class="t">Support</div><div class="d">Accounts, contacts and activities — no leads, deals or quotes.</div></div></div>
+      <div class="settings-card"><div><div class="t">Viewer</div><div class="d">Read-only access across the app — cannot create, edit or delete anything.</div></div></div>
+    </div>
+  `;
+}
+function openUserForm(){
+  const body = `<div class="formgrid">
+    <div class="field full"><label>Full name</label><input id="f_uname"></div>
+    <div class="field full"><label>Email address</label><input id="f_uemail" type="email"></div>
+    <div class="field full"><label>Temporary password</label><input id="f_upass" type="password" placeholder="At least 6 characters"></div>
+    <div class="field full"><label>Role</label><select id="f_urole">${ROLES.map(r=>`<option ${r==="Salesperson"?"selected":""}>${r}</option>`).join("")}</select></div>
+  </div>`;
+  openModal("Add teammate", body, ()=>{
+    const name = val('f_uname').trim();
+    const email = val('f_uemail').trim().toLowerCase();
+    const password = val('f_upass');
+    const role = val('f_urole');
+    if(!name || !email || !password){ toast("Fill in every field."); return false; }
+    if(password.length < 6){ toast("Password must be at least 6 characters."); return false; }
+    const users = getUsers();
+    if(users.some(u=>u.email===email)){ toast("That email is already in use."); return false; }
+    users.push({companyId: CURRENT_USER.companyId, company: CURRENT_USER.company, name, email, password, role});
+    saveUsers(users);
+    toast(`${name} added as ${role}.`);
+    goTo("users-roles");
+    return true;
+  }, "Add");
+}
+function changeUserRole(email, role){
+  const users = getUsers();
+  const u = users.find(x=>x.email===email && x.companyId===CURRENT_USER.companyId);
+  if(!u) return;
+  const isSelf = email === CURRENT_USER.email;
+  const adminCount = users.filter(x=>x.companyId===CURRENT_USER.companyId && (x.role||"Administrator")==="Administrator").length;
+  if(isSelf && (u.role||"Administrator")==="Administrator" && role!=="Administrator" && adminCount<=1){
+    toast("Assign another Administrator before changing your own role.");
+    renderView();
+    return;
+  }
+  u.role = role;
+  saveUsers(users);
+  if(isSelf) CURRENT_USER.role = role;
+  toast(`${u.name}'s role is now ${role}.`);
+  renderView();
+}
+function removeUser(email){
+  if(email === CURRENT_USER.email){ toast("You can't remove yourself."); return; }
+  const users = getUsers();
+  const u = users.find(x=>x.email===email && x.companyId===CURRENT_USER.companyId);
+  if(!u) return;
+  if(!confirm(`Remove ${u.name} from ${CURRENT_USER.company}?`)) return;
+  saveUsers(users.filter(x=>!(x.email===email && x.companyId===CURRENT_USER.companyId)));
+  toast(`${u.name} removed.`);
+  renderView();
 }
 </script>
 

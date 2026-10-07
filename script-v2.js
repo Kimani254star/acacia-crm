@@ -6,7 +6,7 @@
    Functions here intentionally override earlier definitions.
    ========================================================= */
 
-const V2_COLLECTIONS = ["accounts","contacts","leads","deals","activities","timeline","notifications","products","quotes"];
+const V2_COLLECTIONS = ["accounts","contacts","leads","deals","activities","timeline","notifications","products","quotes","trash","notes"];
 
 function seedData(){
   const d = {nextIds:{}, settings:{monthlyTarget:0, taxRate:16, quoteValidityDays:30, quoteSeq:1}};
@@ -21,14 +21,19 @@ function migrateDB(db){
   return db;
 }
 function load(companyId){
-  let db = null;
-  try{
-    const raw = localStorage.getItem(dataKeyFor(companyId));
-    if(raw) db = JSON.parse(raw);
-  }catch(e){}
-  db = migrateDB(db || seedData());
-  localStorage.setItem(dataKeyFor(companyId), JSON.stringify(db));
-  return db;
+  const key = dataKeyFor(companyId);
+  let raw = null, db = null;
+  try{ raw = localStorage.getItem(key); }catch(e){}
+  if(raw){
+    try{ db = JSON.parse(raw); }
+    catch(e){
+      try{ localStorage.setItem(key+"_corrupt_"+Date.now(), raw); }catch(_){}
+      setTimeout(()=>{ try{ toast("Your saved data could not be read. A copy was kept — do not add new records until it is recovered."); }catch(_){} }, 500);
+      SAVE_BLOCKED = true; // never overwrite the original with a blank dataset
+      return migrateDB(seedData());
+    }
+  }
+  return migrateDB(db || seedData());
 }
 
 /* ---------- Nav additions ---------- */
@@ -86,7 +91,7 @@ function renderProducts(c){
       <td>${esc(p.sku||"—")}</td>
       <td>${esc(p.category||"—")}</td>
       <td>${fmtMoney(p.price)}</td>
-      <td>${p.unit||"unit"}</td>
+      <td>${esc(p.unit||"unit")}</td>
       <td><span class="pill ${p.active===false?"status-Unqualified":"status-Qualified"}">${p.active===false?"Inactive":"Active"}</span></td>
       <td style="text-align:right;">${canEdit ? `<button class="btn btn-sm" onclick="openProductForm('${p.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteProduct('${p.id}')">Delete</button>` : ``}</td>
     </tr>`).join("");
@@ -238,7 +243,8 @@ function renderQuoteDetail(c){
         <div class="sub">${acc?esc(acc.name):esc(q.customerName||"No customer set")} · ${fmtDate(q.date)} · valid until ${fmtDate(q.validUntil)}</div>
       </div>
       <div class="actions">
-        <button class="btn" onclick="window.print()">Print / PDF</button>
+        <button class="btn" onclick="printQuote('${q.id}')">Print / PDF</button>
+        ${canManage('quotes') ? `<button class="btn btn-danger" onclick="deleteRecord('quote','${q.id}')">Delete</button>` : ``}
         ${st!=="Accepted" ? `<button class="btn" onclick="setQuoteStatus('${q.id}','Sent')">Mark Sent</button>
         <button class="btn btn-primary" onclick="setQuoteStatus('${q.id}','Accepted')">Mark Accepted</button>` : ``}
         ${st!=="Declined" ? `<button class="btn btn-danger" onclick="setQuoteStatus('${q.id}','Declined')">Declined</button>`:``}
@@ -296,6 +302,7 @@ function lineItemRow(q,it,idx){
   </div>`;
 }
 function addQuoteItem(id){
+  if(!canManage('quotes')){ toast("You do not have permission to change quotations."); return; }
   const q = findQuote(id); if(!q) return;
   q.items = q.items || [];
   q.items.push({desc:"", qty:1, price:0, discount:0});
@@ -307,11 +314,13 @@ function addQuoteProduct(id){
   const p = DB.products.find(x=>x.id===(sel && sel.value));
   if(!p){ toast("Pick a product first."); return; }
   q.items = q.items || [];
-  q.items.push({desc:p.name + (p.sku?` (${p.sku})`:""), qty:1, price:Number(p.price||0), discount:0, productId:p.id});
+  q.items.push({desc:p.name + (p.sku?` (${esc(p.sku)})`:""), qty:1, price:Number(p.price||0), discount:0, productId:p.id});
   save(); renderView();
 }
 function updateQuoteItem(id, idx, field, value){
+  if(!canManage('quotes')){ toast("You do not have permission to change quotations."); return; }
   const q = findQuote(id); if(!q || !q.items[idx]) return;
+  if(q.status==="Accepted"){ return; }
   q.items[idx][field] = (field==="desc") ? value : Number(value||0);
   save();
   if(field!=="desc" || false) { /* keep focus: only refresh totals */ }
@@ -333,10 +342,12 @@ function refreshQuoteTotals(q, idx){
   }
 }
 function removeQuoteItem(id, idx){
+  if(!canManage('quotes')){ toast("You do not have permission to change quotations."); return; }
   const q = findQuote(id); if(!q) return;
   q.items.splice(idx,1); save(); renderView();
 }
 function saveQuoteText(id){
+  if(!canManage('quotes')){ toast("You do not have permission to change quotations."); return; }
   const q = findQuote(id); if(!q) return;
   const n = document.getElementById("q_notes"), t = document.getElementById("q_terms");
   if(n) q.notes = n.value;
@@ -344,6 +355,7 @@ function saveQuoteText(id){
   save();
 }
 function editQuoteMeta(id){
+  if(!canManage('quotes')){ toast("You do not have permission to change quotations."); return; }
   const q = findQuote(id); if(!q) return;
   const body = `<div class="formgrid">
     <div class="field"><label>Account</label><select id="q_account"><option value="">— None —</option>${DB.accounts.map(a=>`<option value="${a.id}" ${q.account===a.id?"selected":""}>${esc(a.name)}</option>`).join("")}</select></div>
@@ -361,22 +373,27 @@ function editQuoteMeta(id){
   });
 }
 function setQuoteStatus(id, status){
+  if(!canManage('quotes')){ toast("You do not have permission to change quotations."); renderView(); return; }
   const q = findQuote(id); if(!q) return;
+  if(status==="Accepted" && q.validUntil && q.validUntil < todayISO()){ toast("This quotation has expired. Extend the valid-until date before accepting."); return; }
   q.status = status;
   addTimeline(q.id, "quote", `Quotation ${q.number} marked ${status}.`);
   notify(`Quotation ${q.number} marked ${status}.`);
   save(); renderView(); toast("Status: "+status);
   if(status==="Accepted" && !q.deal) quoteToDeal(id, true);
+  else if(status==="Accepted" && q.deal){ const dl=findDeal(q.deal); if(dl){ dl.amount=Math.round(quoteTotals(q).total); applyStageChange(dl,"Closed Won"); save(); renderView(); } }
 }
 function quoteToDeal(id, silent){
+  if(!canManage('deals')){ toast("You do not have permission to create deals."); return; }
   const q = findQuote(id); if(!q) return;
   const t = quoteTotals(q);
   const d = {
     id: uid("dl"),
     name: (findAccount(q.account) ? findAccount(q.account).name : (q.customerName||"New")) + " — " + q.number,
     account: q.account, contact: q.contact,
-    amount: Math.round(t.total), stage: q.status==="Accepted" ? "Negotiation" : "Proposal",
-    probability: q.status==="Accepted" ? 80 : 50,
+    amount: Math.round(t.total), stage: q.status==="Accepted" ? "Closed Won" : "Proposal",
+    probability: q.status==="Accepted" ? 100 : 50,
+    stageChangedAt: todayISO(), closedAt: q.status==="Accepted" ? todayISO() : "",
     closing: q.validUntil || todayISO(), owner: q.owner || CURRENT_USER.name,
     source: "Quotation", type: "New Business", nextStep: "Follow up on quotation", timeline: []
   };
@@ -394,7 +411,7 @@ function quoteToDeal(id, silent){
 function renderTargets(c){
   const target = Number(DB.settings.monthlyTarget||0);
   const month = todayISO().slice(0,7);
-  const wonThisMonth = DB.deals.filter(d=>d.stage==="Closed Won" && (d.closing||"").slice(0,7)===month);
+  const wonThisMonth = DB.deals.filter(d=>d.stage==="Closed Won" && (d.closedAt||d.closing||"").slice(0,7)===month);
   const won = wonThisMonth.reduce((s,d)=>s+Number(d.amount||0),0);
   const openWeighted = DB.deals.filter(d=>!d.stage.startsWith("Closed")).reduce((s,d)=>s+Number(d.amount||0)*Number(d.probability||0)/100,0);
   const pct = target ? Math.min(100, Math.round(won/target*100)) : 0;
@@ -442,7 +459,7 @@ function editTarget(){
 /* =========================================================
    CSV / JSON IMPORT-EXPORT
    ========================================================= */
-function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
 function csvCell(v){
   const s = v==null ? "" : (typeof v === "object" ? JSON.stringify(v) : String(v));
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
@@ -489,6 +506,7 @@ const IMPORT_TEMPLATES = {
   products:["name","sku","category","price","unit","description"]
 };
 function openImport(){
+  if(!canManage('leads') && !canManage('accounts') && !canManage('contacts') && !canManage('products')){ toast("You do not have permission to import data."); return; }
   const body = `
     <div class="field full"><label>What are you importing?</label>
       <select id="im_type">${Object.keys(IMPORT_TEMPLATES).map(k=>`<option value="${k}">${k.charAt(0).toUpperCase()+k.slice(1)}</option>`).join("")}</select>
@@ -635,10 +653,10 @@ function buildPalette(q){
   const out = [];
   PALETTE_PAGES.filter(p=>hit(p[1])).slice(0,6).forEach(p=> out.push({tag:"Page", label:p[1], go:()=>goTo(p[0])}));
   if(q){
-    DB.leads.filter(l=>hit(l.name)||hit(l.company)).slice(0,5).forEach(l=>out.push({tag:"Lead", label:`${l.name} · ${l.company||""}`, go:()=>goTo("lead-detail",{type:"lead",id:l.id})}));
+    DB.leads.filter(l=>hit(l.name)||hit(l.company)).slice(0,5).forEach(l=>out.push({tag:"Lead", label:`${esc(l.name)} · ${esc(l.company||"")}`, go:()=>goTo("lead-detail",{type:"lead",id:l.id})}));
     DB.accounts.filter(a=>hit(a.name)).slice(0,5).forEach(a=>out.push({tag:"Account", label:a.name, go:()=>goTo("account-detail",{type:"account",id:a.id})}));
-    DB.contacts.filter(ct=>hit(ct.first+" "+ct.last)||hit(ct.email)).slice(0,5).forEach(ct=>out.push({tag:"Contact", label:`${ct.first} ${ct.last}`, go:()=>goTo("contacts")}));
-    DB.deals.filter(d=>hit(d.name)).slice(0,5).forEach(d=>out.push({tag:"Deal", label:`${d.name} · ${fmtMoney(d.amount)}`, go:()=>goTo("deal-detail",{type:"deal",id:d.id})}));
+    DB.contacts.filter(ct=>hit(ct.first+" "+ct.last)||hit(ct.email)).slice(0,5).forEach(ct=>out.push({tag:"Contact", label:`${esc(ct.first)} ${esc(ct.last)}`, go:()=>goTo("contact-detail",{type:"contact",id:ct.id})}));
+    DB.deals.filter(d=>hit(d.name)).slice(0,5).forEach(d=>out.push({tag:"Deal", label:`${esc(d.name)} · ${fmtMoney(d.amount)}`, go:()=>goTo("deal-detail",{type:"deal",id:d.id})}));
     DB.quotes.filter(x=>hit(x.number)||hit(x.customerName)).slice(0,5).forEach(x=>out.push({tag:"Quote", label:`${x.number} · ${fmtMoney(Math.round(quoteTotals(x).total))}`, go:()=>goTo("quote-detail",{type:"quote",id:x.id})}));
   }
   palResults = out; palIndex = 0;
@@ -728,7 +746,7 @@ const ROLE_NAV = {
   "Marketing":     ["dashboard","leads","lead-sources","lead-scoring","reports","analytics"],
   "Support":       ["dashboard","accounts","contacts","tasks","calls","meetings","calendar"]
 };
-const NAV_DETAIL_BASE = {"lead-detail":"leads","account-detail":"accounts","deal-detail":"deals","quote-detail":"quotes"};
+const NAV_DETAIL_BASE = {"lead-detail":"leads","contact-detail":"contacts","account-detail":"accounts","deal-detail":"deals","quote-detail":"quotes"};
 
 function currentRole(){ return (CURRENT_USER && CURRENT_USER.role) || "Administrator"; }
 function isAdmin(){ return currentRole() === "Administrator"; }
@@ -773,7 +791,7 @@ function renderNav(){
     visible.forEach(it=>{
       const d = document.createElement("div");
       d.className = "navitem" + (currentView===it.id ? " active":"");
-      d.innerHTML = `<span class="dot"></span>${it.label}`;
+      d.innerHTML = `<span class="dot"></span>${esc(it.label)}`;
       d.onclick = ()=>{ goTo(it.id); if(window.innerWidth<=840) document.getElementById("sidebar").classList.remove("open"); };
       g.appendChild(d);
     });
@@ -822,6 +840,7 @@ function renderView(){
     analytics: renderAnalytics,
     settings: renderSettings,
     "lead-detail": renderLeadDetail,
+    "contact-detail": renderContactDetail,
     "users-roles": renderUsersRoles
   };
   const fn = map[currentView] || renderDashboard;
@@ -916,3 +935,1022 @@ function removeUser(email){
   toast(`${u.name} removed.`);
   renderView();
 }
+
+
+/* =========================================================
+   DELETE + RECYCLE BIN (audit H7)
+   ========================================================= */
+const TRASH_MAP = {lead:["leads","leads"], account:["accounts","accounts"], contact:["contacts","contacts"], deal:["deals","deals"], activity:["activities","activities"], quote:["quotes","quotes"]};
+const TRASH_LIST_VIEW = {lead:"leads", account:"accounts", contact:"contacts", deal:"deals", activity:"tasks", quote:"quotes"};
+function recordLabel(type, r){
+  if(type==="contact") return ((r.first||"")+" "+(r.last||"")).trim() || "Contact";
+  if(type==="quote") return r.number || "Quotation";
+  if(type==="activity") return r.title || "Activity";
+  return r.name || type;
+}
+function deleteRecord(type, id, quiet){
+  const map = TRASH_MAP[type]; if(!map) return;
+  if(!canManage(map[1])){ toast("You do not have permission to delete this."); return; }
+  const list = DB[map[0]]; const idx = list.findIndex(x=>x.id===id); if(idx<0) return;
+  const rec = list[idx];
+  if(currentRole()==="Salesperson" && rec.owner && rec.owner!==CURRENT_USER.name){ toast("You can only delete records you own."); return; }
+  const unlinked = {};
+  let extra = "";
+  if(type==="account"){
+    unlinked.contacts = DB.contacts.filter(c=>c.account===id).map(c=>c.id);
+    unlinked.deals = DB.deals.filter(d=>d.account===id).map(d=>d.id);
+    unlinked.quotes = DB.quotes.filter(q=>q.account===id).map(q=>q.id);
+    extra = `\n${unlinked.contacts.length} contact(s), ${unlinked.deals.length} deal(s) and ${unlinked.quotes.length} quotation(s) will be un-linked from it.`;
+  }
+  if(type==="deal"){
+    unlinked.quotes = DB.quotes.filter(q=>q.deal===id).map(q=>q.id);
+    unlinked.activities = DB.activities.filter(a=>a.related===id && a.relatedType==="deal").map(a=>a.id);
+  }
+  if(!quiet && !confirm(`Delete "${recordLabel(type,rec)}"? It moves to the Recycle Bin (Settings) where it can be restored.${extra}`)) return;
+  if(type==="account"){
+    DB.contacts.forEach(c=>{ if(c.account===id) c.account=""; });
+    DB.deals.forEach(d=>{ if(d.account===id) d.account=""; });
+    DB.quotes.forEach(q=>{ if(q.account===id) q.account=""; });
+  }
+  if(type==="deal"){ DB.quotes.forEach(q=>{ if(q.deal===id) q.deal=""; }); }
+  list.splice(idx,1);
+  DB.trash = DB.trash || [];
+  DB.trash.unshift({tid:uid("tr"), type, record:rec, unlinked, label:recordLabel(type,rec), deletedAt:todayISO(), deletedBy:CURRENT_USER.name});
+  if(DB.trash.length>200) DB.trash.length = 200;
+  addTimeline(id, type, `${type[0].toUpperCase()+type.slice(1)} "${recordLabel(type,rec)}" deleted by ${CURRENT_USER.name}.`);
+  save();
+  if(quiet) return true;
+  toast("Moved to Recycle Bin.");
+  const back = TRASH_LIST_VIEW[type];
+  if(typeof currentView!=="undefined" && /-detail$/.test(currentView)) goTo(back); else renderView();
+}
+function restoreRecord(tid){
+  const t = (DB.trash||[]).find(x=>x.tid===tid); if(!t) return;
+  const map = TRASH_MAP[t.type];
+  if(!canManage(map[1])){ toast("You do not have permission to restore this."); return; }
+  DB[map[0]].push(t.record);
+  const u = t.unlinked || {};
+  if(t.type==="account"){
+    DB.contacts.forEach(c=>{ if((u.contacts||[]).includes(c.id)) c.account=t.record.id; });
+    DB.deals.forEach(d=>{ if((u.deals||[]).includes(d.id)) d.account=t.record.id; });
+    DB.quotes.forEach(q=>{ if((u.quotes||[]).includes(q.id)) q.account=t.record.id; });
+  }
+  if(t.type==="deal"){ DB.quotes.forEach(q=>{ if((u.quotes||[]).includes(q.id)) q.deal=t.record.id; }); }
+  DB.trash = DB.trash.filter(x=>x.tid!==tid);
+  save(); toast("Restored."); renderView();
+}
+function emptyRecycleBin(){
+  if(!isAdmin()){ toast("Only an Administrator can empty the Recycle Bin."); return; }
+  if(!(DB.trash||[]).length) return;
+  if(!confirm("Permanently delete everything in the Recycle Bin? This cannot be undone.")) return;
+  DB.trash = []; save(); renderView();
+}
+
+/* =========================================================
+   COMPANY PROFILE + BRANDED QUOTE PRINT (audit H11, M11)
+   ========================================================= */
+function companyProfile(){ return Object.assign({name:(CURRENT_USER&&CURRENT_USER.company)||"", address:"", phone:"", email:"", kraPin:"", bank:"", mpesa:"", footer:""}, (DB.settings&&DB.settings.company)||{}); }
+function openCompanyProfile(){
+  if(!canManage('settings')){ toast("Only managers and administrators can edit the company profile."); return; }
+  const p = companyProfile();
+  const f = (id,label,val,full)=>`<div class="field ${full?'full':''}"><label>${label}</label><input id="cp_${id}" value="${esc(val)}"></div>`;
+  openModal("Company profile", `<div class="formgrid">
+    ${f("name","Company name",p.name,true)}${f("address","Address",p.address,true)}
+    ${f("phone","Phone",p.phone)}${f("email","Email",p.email)}
+    ${f("kraPin","KRA PIN",p.kraPin)}${f("mpesa","M-Pesa Paybill / Till",p.mpesa)}
+    ${f("bank","Bank details (bank, account name, number)",p.bank,true)}
+    ${f("footer","Footer line on quotations",p.footer,true)}
+  </div>`, ()=>{
+    DB.settings.company = {};
+    ["name","address","phone","email","kraPin","bank","mpesa","footer"].forEach(k=>{ DB.settings.company[k] = val("cp_"+k).trim(); });
+    save(); toast("Company profile saved."); renderView(); return true;
+  });
+}
+function printQuote(id){
+  const q = findQuote(id); if(!q) return;
+  const p = companyProfile();
+  const acc = findAccount(q.account), ct = findContact(q.contact);
+  const t = quoteTotals(q);
+  const money = n=>"KSh "+Number(n||0).toLocaleString("en-KE",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const rows = (q.items||[]).map((it,i)=>{
+    const line = Number(it.qty||0)*Number(it.price||0)*(1-Number(it.discount||0)/100);
+    return `<tr><td>${i+1}</td><td>${esc(it.desc)}</td><td class="r">${Number(it.qty||0)}</td><td class="r">${money(it.price)}</td><td class="r">${Number(it.discount||0)?Number(it.discount)+"%":"—"}</td><td class="r">${money(line)}</td></tr>`;
+  }).join("") || `<tr><td colspan="6" style="text-align:center;color:#777;">No line items</td></tr>`;
+  const cust = [acc?acc.name:(q.customerName||""), acc&&acc.address, ct&&((ct.first||"")+" "+(ct.last||"")).trim(), (ct&&ct.email)||(acc&&acc.email), (ct&&ct.phone)||(acc&&acc.phone)].filter(Boolean).map(x=>esc(x)).join("<br>");
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(q.number)}</title><style>
+    *{box-sizing:border-box} body{font-family:Cambria,Georgia,serif;color:#1c2b24;margin:0;padding:28px 36px;font-size:13px}
+    .head{display:flex;justify-content:space-between;border-bottom:3px solid #1f4d3a;padding-bottom:12px;margin-bottom:18px}
+    h1{margin:0;font-size:22px;color:#1f4d3a} .muted{color:#555;line-height:1.5}
+    .qt{text-align:right} .qt h2{margin:0;font-size:20px;letter-spacing:2px;color:#1f4d3a}
+    .cols{display:flex;gap:30px;margin-bottom:16px} .cols>div{flex:1} .lab{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#777;margin-bottom:4px}
+    table{width:100%;border-collapse:collapse;margin:8px 0} th{background:#1f4d3a;color:#fff;text-align:left;padding:7px 8px;font-size:12px}
+    td{padding:7px 8px;border-bottom:1px solid #ddd;vertical-align:top} .r{text-align:right;white-space:nowrap}
+    .tot{width:290px;margin-left:auto} .tot td{border:0;padding:4px 8px} .tot .g td{border-top:2px solid #1f4d3a;font-weight:bold;font-size:15px}
+    .box{border:1px solid #ddd;padding:10px 12px;margin-top:14px;white-space:pre-wrap;line-height:1.5}
+    .sig{display:flex;gap:40px;margin-top:46px} .sig div{flex:1;border-top:1px solid #333;padding-top:6px;font-size:12px}
+    .foot{margin-top:26px;text-align:center;color:#666;font-size:11px}
+    @media print{body{padding:0}}
+  </style></head><body>
+    <div class="head"><div><h1>${esc(p.name)}</h1><div class="muted">${[p.address,p.phone,p.email].filter(Boolean).map(esc).join("<br>")}${p.kraPin?`<br>KRA PIN: ${esc(p.kraPin)}`:""}</div></div>
+    <div class="qt"><h2>QUOTATION</h2><div class="muted">No: <b>${esc(q.number)}</b><br>Date: ${fmtDate(q.date)}<br>Valid until: ${fmtDate(q.validUntil)}</div></div></div>
+    <div class="cols"><div><div class="lab">Prepared for</div>${cust||"—"}</div><div><div class="lab">Prepared by</div>${esc(q.owner||CURRENT_USER.name)}</div></div>
+    <table><thead><tr><th>#</th><th>Description</th><th class="r">Qty</th><th class="r">Unit price</th><th class="r">Disc.</th><th class="r">Amount</th></tr></thead><tbody>${rows}</tbody></table>
+    <table class="tot"><tr><td>Subtotal</td><td class="r">${money(t.sub)}</td></tr><tr><td>VAT (${Number(q.taxRate||0)}%)</td><td class="r">${money(t.tax)}</td></tr><tr class="g"><td>Total</td><td class="r">${money(t.total)}</td></tr></table>
+    ${q.notes?`<div class="box"><div class="lab">Notes</div>${esc(q.notes)}</div>`:""}
+    ${q.terms?`<div class="box"><div class="lab">Terms &amp; conditions</div>${esc(q.terms)}</div>`:""}
+    ${(p.bank||p.mpesa)?`<div class="box"><div class="lab">Payment details</div>${p.bank?`Bank: ${esc(p.bank)}<br>`:""}${p.mpesa?`M-Pesa: ${esc(p.mpesa)}`:""}</div>`:""}
+    <div class="sig"><div>Authorised signature &amp; date</div><div>Customer acceptance (name, signature, date)</div></div>
+    <div class="foot">${esc(p.footer||"Thank you for your business.")}</div>
+  </body></html>`;
+  const w = window.open("", "_blank");
+  if(!w){ toast("Allow pop-ups to print the quotation."); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+  w.focus(); setTimeout(()=>{ try{ w.print(); }catch(e){} }, 400);
+}
+
+/* Settings: add Company profile + Recycle Bin panels without touching the base renderer */
+(function(){
+  const base = renderSettings;
+  renderSettings = function(c){
+    base(c);
+    const trash = DB.trash || [];
+    const el = document.createElement("div");
+    el.className = "panel";
+    el.innerHTML = `<h3>Company profile &amp; quotations</h3>
+      <div class="settings-card"><div><div class="t">Letterhead details</div><div class="d">Address, KRA PIN, bank and M-Pesa details printed on every quotation.</div></div><button class="btn btn-sm btn-primary" onclick="openCompanyProfile()">Edit</button></div>
+      <h3 style="margin-top:18px;">Recycle Bin <span class="count">(${trash.length})</span></h3>
+      ${trash.length ? trash.slice(0,30).map(t=>`<div class="settings-card"><div><div class="t">${esc(t.label)}</div><div class="d">${esc(t.type)} · deleted ${fmtDate(t.deletedAt)} by ${esc(t.deletedBy)}</div></div><button class="btn btn-sm" onclick="restoreRecord('${t.tid}')">Restore</button></div>`).join("") + (isAdmin()?`<div style="margin-top:8px;"><button class="btn btn-sm btn-danger" onclick="emptyRecycleBin()">Empty Recycle Bin</button></div>`:"") : `<div class="empty">Nothing deleted.</div>`}`;
+    c.appendChild(el);
+  };
+})();
+
+
+/* =========================================================
+   OWNER DROPDOWN + SALESPERSON SCOPING (audit M2, H1)
+   ========================================================= */
+function ownerSelect(id, current){
+  const me = CURRENT_USER.name;
+  let names = companyUsers().map(u=>u.name).filter(Boolean);
+  if(!names.includes(me)) names.unshift(me);
+  if(current && !names.includes(current)) names.push(current); // keep legacy typed owners selectable
+  names = [...new Set(names)];
+  const locked = currentRole()==="Salesperson";
+  if(locked) names = [current && names.includes(current) ? current : me];
+  return `<select id="${id}" ${locked?'disabled':''}>${names.map(nm=>`<option value="${esc(nm)}" ${nm===(current||me)?'selected':''}>${esc(nm)}</option>`).join("")}</select>`;
+}
+/* val() on a disabled select still returns its value, so locked owners are saved unchanged. */
+
+function scopedDB(){
+  if(currentRole()!=="Salesperson" || !CURRENT_USER) return DB;
+  const me = CURRENT_USER.name;
+  const mine = list => (list||[]).filter(r=>r.owner===me);
+  const copy = Object.assign({}, DB);
+  ["leads","accounts","contacts","deals","activities","quotes"].forEach(k=>{ copy[k] = mine(DB[k]); });
+  return copy;
+}
+function withScope(fn){
+  return function(){
+    const real = DB;
+    if(currentRole()!=="Salesperson") return fn.apply(this, arguments);
+    SCOPED_RENDER = true; DB = scopedDB();
+    try{ return fn.apply(this, arguments); }
+    finally{ DB = real; SCOPED_RENDER = false; }
+  };
+}
+renderDashboard = withScope(renderDashboard);
+renderPipeline  = withScope(renderPipeline);
+renderForecast  = withScope(renderForecast);
+renderActivities= withScope(renderActivities);
+renderCalendar  = withScope(renderCalendar);
+renderReports   = withScope(renderReports);
+renderAnalytics = withScope(renderAnalytics);
+renderTargets   = withScope(renderTargets);
+renderQuotes    = withScope(renderQuotes);
+buildPalette    = withScope(buildPalette);
+
+
+/* =========================================================
+   ACTIVITIES, REMINDERS, NOTIFICATIONS (audit H8, H9)
+   ========================================================= */
+function isoAddDays(iso, n){
+  const [y,m,d] = iso.split("-").map(Number);
+  const dt = new Date(y, m-1, d+n);
+  return dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0");
+}
+function isoAddMonths(iso, n){
+  const [y,m,d] = iso.split("-").map(Number);
+  const dt = new Date(y, m-1+n, 1);
+  const last = new Date(dt.getFullYear(), dt.getMonth()+1, 0).getDate();
+  return dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(Math.min(d,last)).padStart(2,"0");
+}
+function relatedLabel(a){
+  if(!a.related) return "";
+  let r = null, t = a.relatedType;
+  if(t==="lead") r = findLead(a.related);
+  else if(t==="account") r = findAccount(a.related);
+  else if(t==="deal") r = findDeal(a.related);
+  else if(t==="contact"){ const c=findContact(a.related); return c ? ((c.first||"")+" "+(c.last||"")).trim() : ""; }
+  return r ? r.name : "";
+}
+function activityMeta(a){
+  const bits = [];
+  const rl = relatedLabel(a); if(rl) bits.push("Re: "+rl);
+  if(a.kind==="Call"){ if(a.direction) bits.push(a.direction); if(a.duration) bits.push(a.duration+" min"); if(a.outcome) bits.push(a.outcome); }
+  if(a.kind==="Meeting"){ if(a.duration) bits.push(a.duration+" min"); if(a.location) bits.push("@ "+a.location); if(a.attendees) bits.push("With "+a.attendees); }
+  if(a.kind==="Task" && a.priority && a.priority!=="Normal") bits.push(a.priority+" priority");
+  if(a.remind && a.remind!=="none") bits.push("Reminder "+({"0":"on the day","1":"1 day before","2":"2 days before","7":"1 week before"}[a.remind]||""));
+  if(a.repeat && a.repeat!=="none") bits.push("Repeats "+a.repeat.toLowerCase());
+  if(a.notes) bits.push(a.notes.length>60 ? a.notes.slice(0,60)+"…" : a.notes);
+  return bits.length ? `<div style="color:var(--ink-soft);font-size:11.5px;margin-top:2px;">${bits.map(esc).join(" · ")}</div>` : "";
+}
+function logActivityButtons(id){
+  if(!canManage('activities')) return "";
+  const t = findLead(id)?"lead" : findAccount(id)?"account" : findDeal(id)?"deal" : "";
+  if(!t) return "";
+  return ["Task","Call","Meeting"].map(k=>`<button class="btn btn-sm" style="margin-left:6px;" onclick="openActivityForm('${k}',{related:'${id}',relatedType:'${t}'})">+ ${k}</button>`).join("");
+}
+function openActivityForm(kind, opts){
+  opts = opts || {};
+  if(!canManage('activities')){ toast("You do not have permission to change activities."); return; }
+  const a = opts.id ? DB.activities.find(x=>x.id===opts.id) : null;
+  if(a) kind = a.kind;
+  const g = (k,d)=> a ? (a[k]===undefined?d:a[k]) : d;
+  const relVal = a ? (a.related? a.relatedType+":"+a.related : "") : (opts.related ? opts.relatedType+":"+opts.related : "");
+  const optGroup = (label, type, list, nameFn)=> list.length ? `<optgroup label="${label}">${list.map(r=>`<option value="${type}:${r.id}" ${relVal===type+":"+r.id?"selected":""}>${esc(nameFn(r))}</option>`).join("")}</optgroup>` : "";
+  const sel = (id,arr,cur)=>`<select id="${id}">${arr.map(([val,label])=>`<option value="${val}" ${String(cur)===String(val)?"selected":""}>${label}</option>`).join("")}</select>`;
+  const related = `<div class="field full"><label>Related to</label><select id="f_related"><option value="">— Not linked —</option>
+    ${optGroup("Leads","lead",scopeOwn(DB.leads),r=>r.name+(r.company?" — "+r.company:""))}
+    ${optGroup("Accounts","account",scopeOwn(DB.accounts),r=>r.name)}
+    ${optGroup("Deals","deal",scopeOwn(DB.deals),r=>r.name)}
+    ${optGroup("Contacts","contact",scopeOwn(DB.contacts),r=>((r.first||"")+" "+(r.last||"")).trim())}
+  </select></div>`;
+  let specific = "";
+  if(kind==="Call") specific = `
+    <div class="field"><label>Direction</label>${sel("f_direction",[["Outbound","Outbound"],["Inbound","Inbound"]],g("direction","Outbound"))}</div>
+    <div class="field"><label>Duration (minutes)</label><input id="f_duration" type="number" min="0" value="${esc(g("duration",""))}"></div>
+    <div class="field full"><label>Outcome</label>${sel("f_outcome",[["","— Not yet —"],["Connected","Connected"],["No answer","No answer"],["Left voicemail","Left voicemail"],["Wrong number","Wrong number"],["Follow-up needed","Follow-up needed"]],g("outcome",""))}</div>`;
+  else if(kind==="Meeting") specific = `
+    <div class="field"><label>Duration (minutes)</label><input id="f_duration" type="number" min="0" value="${esc(g("duration",60))}"></div>
+    <div class="field"><label>Location / link</label><input id="f_location" value="${esc(g("location",""))}"></div>
+    <div class="field full"><label>Attendees</label><input id="f_attendees" value="${esc(g("attendees",""))}" placeholder="Names or emails, comma separated"></div>`;
+  else specific = `<div class="field"><label>Priority</label>${sel("f_priority",[["Low","Low"],["Normal","Normal"],["High","High"]],g("priority","Normal"))}</div>`;
+  const body = `<div class="formgrid">
+    <div class="field full"><label>Title</label><input id="f_title" value="${esc(g("title",""))}"></div>
+    ${related}
+    <div class="field"><label>Due date</label><input id="f_due" type="date" value="${esc(g("due",todayISO()))}"></div>
+    <div class="field"><label>Time (optional)</label><input id="f_time" type="time" value="${esc(g("time",""))}"></div>
+    ${specific}
+    <div class="field"><label>Reminder</label>${sel("f_remind",[["none","None"],["0","On the day"],["1","1 day before"],["2","2 days before"],["7","1 week before"]],g("remind","none"))}</div>
+    <div class="field"><label>Repeat</label>${sel("f_repeat",[["none","Does not repeat"],["Daily","Daily"],["Weekly","Weekly"],["Monthly","Monthly"]],g("repeat","none"))}</div>
+    <div class="field"><label>Owner</label>${ownerSelect("f_owner", g("owner",CURRENT_USER.name))}</div>
+    <div class="field full"><label>Notes</label><textarea id="f_notes">${esc(g("notes",""))}</textarea></div>
+  </div>`;
+  openModal(`${a?"Edit":"New"} ${kind}`, body, ()=>{
+    const title = val('f_title');
+    if(!title){ toast("Please enter a title."); return false; }
+    const due = val('f_due'); if(!due){ toast("Please choose a due date."); return false; }
+    const rel = val('f_related').split(":");
+    const data = {kind, title, due, time:val('f_time'), owner:val('f_owner'), remind:val('f_remind'), repeat:val('f_repeat'), notes:val('f_notes'),
+      related: rel[1]||"", relatedType: rel[0]||""};
+    if(kind==="Call"){ data.direction=val('f_direction'); data.duration=val('f_duration'); data.outcome=val('f_outcome'); }
+    else if(kind==="Meeting"){ data.duration=val('f_duration'); data.location=val('f_location'); data.attendees=val('f_attendees'); }
+    else { data.priority=val('f_priority'); }
+    if(a){ Object.assign(a,data); notify(`${kind} updated: ${title}`, data.owner); }
+    else { data.id=uid("act"); data.done=false; data.created=todayISO(); DB.activities.push(data); notify(`New ${kind.toLowerCase()} created: ${title}`, data.owner); }
+    save(); renderView();
+    return true;
+  });
+}
+/* recurring: completing one occurrence schedules the next */
+(function(){
+  const base = toggleActivity;
+  toggleActivity = function(id){
+    const a0 = DB.activities.find(x=>x.id===id);
+    const wasDone = a0 ? a0.done : true;
+    base(id);
+    const a = DB.activities.find(x=>x.id===id);
+    if(a && !wasDone && a.done && a.repeat && a.repeat!=="none"){
+      const next = a.repeat==="Daily" ? isoAddDays(a.due,1) : a.repeat==="Weekly" ? isoAddDays(a.due,7) : isoAddMonths(a.due,1);
+      const copy = Object.assign({}, a, {id:uid("act"), due:next<todayISO()?todayISO():next, done:false, outcome:""});
+      DB.activities.push(copy); save(); renderView();
+      toast("Next "+a.repeat.toLowerCase()+" occurrence scheduled for "+fmtDate(copy.due)+".");
+    }
+  };
+})();
+
+/* ---------- per-user notifications with real timestamps ---------- */
+function notify(text, user){
+  DB.notifications = DB.notifications || [];
+  DB.notifications.unshift({id:uid("nt"), text, ts:Date.now(), user:user||"", readBy:[]});
+  if(DB.notifications.length>100) DB.notifications.length = 100;
+  save(); renderNotifBadge();
+}
+function myNotifs(){
+  const me = CURRENT_USER ? CURRENT_USER.name : "";
+  return (DB.notifications||[]).filter(n=>!n.user || n.user===me);
+}
+function notifUnread(n){
+  const me = CURRENT_USER ? CURRENT_USER.name : "";
+  return !n.read && !(n.readBy||[]).includes(me);
+}
+function timeAgo(ts){
+  if(!ts) return "Earlier";
+  const m = Math.floor((Date.now()-ts)/60000);
+  if(m<1) return "Just now";
+  if(m<60) return m+" min ago";
+  const h = Math.floor(m/60); if(h<24) return h+" hour"+(h===1?"":"s")+" ago";
+  const d = Math.floor(h/24); if(d<7) return d+" day"+(d===1?"":"s")+" ago";
+  return new Date(ts).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+}
+function renderNotifBadge(){
+  const unread = myNotifs().filter(notifUnread).length;
+  const badge = document.getElementById("notifCount"); if(!badge) return;
+  if(unread>0){ badge.style.display="flex"; badge.textContent = unread>9?"9+":unread; }
+  else badge.style.display="none";
+}
+function renderNotifPanel(){
+  const panel = document.getElementById("notifPanel");
+  const list = myNotifs().slice(0,15);
+  panel.innerHTML = list.length ? list.map(n=>`<div class="notif-item" style="${notifUnread(n)?'font-weight:600;':''}">${esc(n.text)}<div class="t">${esc(timeAgo(n.ts))}</div></div>`).join("") : `<div class="notif-item">No notifications yet.</div>`;
+}
+function markNotifsRead(){
+  const me = CURRENT_USER.name;
+  myNotifs().forEach(n=>{ n.readBy = n.readBy||[]; if(!n.readBy.includes(me)) n.readBy.push(me); });
+  save(); renderNotifBadge();
+}
+
+/* ---------- reminder engine ---------- */
+function runReminders(){
+  if(!DB || !CURRENT_USER) return;
+  DB.alertsSeen = DB.alertsSeen || {};
+  const today = todayISO(), seen = DB.alertsSeen;
+  let added = 0;
+  const once = (key, text, user)=>{ if(seen[key]) return; seen[key] = today; notify(text, user); added++; };
+  (DB.activities||[]).forEach(a=>{
+    if(a.done || !a.due) return;
+    const label = `${a.kind}: ${a.title}`;
+    if(a.remind && a.remind!=="none"){
+      const rd = isoAddDays(a.due, -Number(a.remind));
+      if(today>=rd && today<a.due) once(`ar:${a.id}:${a.due}`, `Reminder — ${label} is due ${fmtDate(a.due)}${a.time?" at "+a.time:""}.`, a.owner);
+    }
+    if(a.due===today) once(`ad:${a.id}:${a.due}`, `Due today — ${label}${a.time?" at "+a.time:""}.`, a.owner);
+    else if(a.due<today) once(`ao:${a.id}:${a.due}`, `Overdue — ${label} was due ${fmtDate(a.due)}.`, a.owner);
+  });
+  (DB.leads||[]).forEach(l=>{
+    if(!l.nextFollowup || ["Converted","Lost","Unqualified"].includes(l.status)) return;
+    if(l.nextFollowup<=today) once(`lf:${l.id}:${l.nextFollowup}`, `Follow up with lead ${l.name} (planned ${fmtDate(l.nextFollowup)}).`, l.owner);
+  });
+  (DB.deals||[]).forEach(d=>{
+    if((d.stage||"").startsWith("Closed")) return;
+    if(d.closing){
+      if(d.closing<today) once(`dp:${d.id}:${d.closing}`, `Deal "${d.name}" is past its expected close date (${fmtDate(d.closing)}).`, d.owner);
+      else if(d.closing<=isoAddDays(today,3)) once(`ds:${d.id}:${d.closing}`, `Deal "${d.name}" is due to close on ${fmtDate(d.closing)}.`, d.owner);
+    }
+    const since = d.stageChangedAt || d.created;
+    if(since && since < isoAddDays(today,-30)) once(`dst:${d.id}:${since}`, `Deal "${d.name}" has not moved stage since ${fmtDate(since)}.`, d.owner);
+  });
+  (DB.quotes||[]).forEach(q=>{
+    if(!["Draft","Sent"].includes(q.status) || !q.validUntil) return;
+    if(q.validUntil<today) once(`qe:${q.id}:${q.validUntil}`, `Quotation ${q.number} has expired (${fmtDate(q.validUntil)}).`, q.owner);
+    else if(q.validUntil<=isoAddDays(today,3)) once(`qx:${q.id}:${q.validUntil}`, `Quotation ${q.number} expires on ${fmtDate(q.validUntil)}.`, q.owner);
+  });
+  // prune old dedupe keys
+  const cutoff = isoAddDays(today,-60);
+  Object.keys(seen).forEach(k=>{ if(seen[k] < cutoff) delete seen[k]; });
+  if(!added) save();
+  renderNotifBadge();
+}
+(function(){
+  const base = initApp;
+  let timer = null;
+  initApp = function(){
+    base();
+    runReminders();
+    if(timer) clearInterval(timer);
+    timer = setInterval(()=>{ try{ runReminders(); }catch(e){} }, 10*60*1000);
+  };
+})();
+
+
+/* =========================================================
+   ACCESSIBILITY + TOUCH (audit H12)
+   ========================================================= */
+function a11yify(root){
+  root = root || document;
+  root.querySelectorAll("[onclick],.navitem,.auth-tab,.auth-back,.rowlink").forEach(el=>{
+    if(el.matches("button,input,select,textarea,a[href],summary") || el.id==="modalBackdrop") return;
+    const oc = el.getAttribute("onclick")||"";
+    if(oc && oc.length<40 && oc.includes("stopPropagation")) return;
+    if(!el.hasAttribute("tabindex")) el.setAttribute("tabindex","0");
+    if(!el.hasAttribute("role")) el.setAttribute("role","button");
+  });
+  root.querySelectorAll(".navitem.active").forEach(el=>el.setAttribute("aria-current","page"));
+  root.querySelectorAll(".field, .auth-field").forEach(f=>{
+    const lab = f.querySelector("label"), ctl = f.querySelector("input,select,textarea");
+    if(lab && ctl && ctl.id && !lab.htmlFor) lab.htmlFor = ctl.id;
+  });
+  const nav = document.getElementById("navlist"); if(nav) nav.setAttribute("aria-label","Main navigation");
+}
+document.addEventListener("keydown", e=>{
+  const el = e.target;
+  if((e.key==="Enter"||e.key===" ") && el && el.getAttribute && el.getAttribute("role")==="button" && !el.matches("button,input,select,textarea,a[href]")){
+    e.preventDefault(); el.click();
+  }
+});
+(function(){
+  const baseView = renderView;
+  renderView = function(){ baseView.apply(this, arguments); a11yify(document.getElementById("content")); a11yify(document.getElementById("navlist")); };
+  const baseNav = renderNav;
+  renderNav = function(){ baseNav.apply(this, arguments); a11yify(document.getElementById("navlist")); };
+})();
+
+/* login / register: Enter submits */
+document.addEventListener("keydown", e=>{
+  if(e.key!=="Enter" || !e.target || e.target.tagName!=="INPUT") return;
+  const id = e.target.id||"";
+  if(id==="loginEmail"||id==="loginPassword"){ e.preventDefault(); handleLogin(); }
+  else if(["regCompany","regName","regEmail","regPassword"].includes(id)){ e.preventDefault(); handleRegister(); }
+});
+document.addEventListener("DOMContentLoaded", ()=>{ a11yify(document.getElementById("authScreen")); });
+
+/* modals: dialog role, focus management, Escape, focus trap */
+let modalReturnFocus = null;
+(function(){
+  const baseOpen = openModal, baseClose = closeModal;
+  openModal = function(title, bodyHtml, onSave, saveLabel){
+    modalReturnFocus = document.activeElement;
+    baseOpen(title, bodyHtml, onSave, saveLabel);
+    const box = document.getElementById("modalBox");
+    box.setAttribute("role","dialog"); box.setAttribute("aria-modal","true");
+    const h = box.querySelector(".modal-head h3"); if(h){ h.id = "modalTitle"; box.setAttribute("aria-labelledby","modalTitle"); }
+    const x = box.querySelector(".closebtn"); if(x) x.setAttribute("aria-label","Close dialog");
+    a11yify(box);
+    const first = box.querySelector(".modal-body input:not([disabled]),.modal-body select:not([disabled]),.modal-body textarea");
+    (first || x || box).focus && (first || x || box).focus();
+  };
+  closeModal = function(){
+    baseClose();
+    if(modalReturnFocus && document.contains(modalReturnFocus) && modalReturnFocus.focus){ try{ modalReturnFocus.focus(); }catch(e){} }
+    modalReturnFocus = null;
+  };
+})();
+document.addEventListener("keydown", e=>{
+  const bd = document.getElementById("modalBackdrop");
+  if(!bd || !bd.classList.contains("open")) return;
+  if(e.key==="Escape"){ e.preventDefault(); closeModal(); return; }
+  if(e.key==="Tab"){
+    const f = [...document.getElementById("modalBox").querySelectorAll('button,input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter(x=>!x.disabled && x.offsetParent!==null || x===document.activeElement);
+    if(!f.length) return;
+    const first = f[0], last = f[f.length-1];
+    if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+    else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+  }
+});
+
+
+/* =========================================================
+   VALIDATION + IMPORT WIZARD (audit M7, M13)
+   ========================================================= */
+IMPORT_TEMPLATES.deals = ["name","account","amount","stage","closing","probability","owner","source","nextStep"];
+const IMPORT_PERM = {leads:"leads", accounts:"accounts", contacts:"contacts", products:"products", deals:"deals"};
+const IMPORT_LEAD_STATUSES = ["New","Contacted","Attempted Contact","Qualified","Unqualified","Nurturing","Lost"];
+const IMPORT_MAX_ROWS = 5000, IMPORT_MAX_BYTES = 2*1024*1024;
+const IMPORT_SYNONYMS = {
+  name:["full name","fullname","lead name","account name","company name","deal name","product name","title of deal"],
+  first:["first name","firstname","given name"], last:["last name","lastname","surname","family name"],
+  email:["e-mail","email address","mail"], phone:["mobile","telephone","tel","phone number","mobile number","cell"],
+  company:["company name","organisation","organization","business"], account:["account name","company","customer","organisation"],
+  closing:["close date","closing date","expected close","expected close date"], amount:["value","deal value","total"],
+  nextStep:["next step","next_step"], source:["lead source"], sku:["code","product code"], price:["unit price","selling price"],
+  probability:["prob","win probability"], owner:["assigned to","sales rep","rep"]
+};
+function normKey(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
+function validEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e); }
+/* Kenyan-friendly phone normalisation. Returns {ok, value}. Empty is ok. */
+function normalizePhone(p){
+  p = String(p||"").trim();
+  if(!p) return {ok:true, value:""};
+  let d = p.replace(/[\s\-().]/g,"");
+  const plus = d.startsWith("+"); d = d.replace(/^\+/,"");
+  if(!/^\d+$/.test(d)) return {ok:false, value:p};
+  if(!plus){
+    if(/^0[17]\d{8}$/.test(d)) d = "254"+d.slice(1);
+    else if(/^[17]\d{8}$/.test(d)) d = "254"+d;
+    else if(d.startsWith("00")) d = d.slice(2);
+  }
+  if(d.length<9 || d.length>15) return {ok:false, value:p};
+  return {ok:true, value:"+"+d};
+}
+function importKey(type, r){
+  const n = x=>String(x||"").trim().toLowerCase();
+  if(type==="leads") return r.email ? "e:"+n(r.email) : "n:"+n(r.name)+"|"+n(r.company);
+  if(type==="accounts") return "n:"+n(r.name);
+  if(type==="contacts") return r.email ? "e:"+n(r.email) : "n:"+n(r.first)+"|"+n(r.last)+"|"+n(r.accountName||r.account);
+  if(type==="products") return r.sku ? "s:"+n(r.sku) : "n:"+n(r.name);
+  if(type==="deals") return "n:"+n(r.name)+"|"+n(r.accountName||r.account);
+  return "";
+}
+function existingKey(type, rec){
+  if(type==="contacts"){ const a=findAccount(rec.account); return importKey(type,{email:rec.email,first:rec.first,last:rec.last,accountName:a?a.name:""}); }
+  if(type==="deals"){ const a=findAccount(rec.account); return importKey(type,{name:rec.name,accountName:a?a.name:""}); }
+  return importKey(type, rec);
+}
+function validateImportRow(type, raw){
+  const errors = [], warnings = [];
+  const r = Object.assign({}, raw);
+  const users = companyUsers().map(u=>u.name);
+  const me = CURRENT_USER.name;
+  // owner
+  if(currentRole()==="Salesperson") r.owner = me;
+  else if(r.owner && !users.includes(r.owner)){ warnings.push(`Owner "${r.owner}" is not a user — assigned to you`); r.owner = me; }
+  else if(!r.owner) r.owner = me;
+  // email / phone
+  if(r.email && !validEmail(r.email)) errors.push(`Invalid email "${r.email}"`);
+  if(r.phone!==undefined){ const p = normalizePhone(r.phone); if(!p.ok) errors.push(`Invalid phone "${r.phone}"`); else r.phone = p.value; }
+  if(type==="leads"){
+    if(!r.name && !r.company) errors.push("Needs a name or company");
+    if(r.status && !IMPORT_LEAD_STATUSES.includes(r.status)){ warnings.push(`Status "${r.status}" not recognised — set to New`); r.status = "New"; }
+    if(r.score!==undefined && r.score!==""){ const n = Number(r.score); if(isNaN(n)) { warnings.push("Score is not a number — set to 10"); r.score = 10; } else r.score = Math.max(0, Math.min(100, Math.round(n))); }
+  }
+  if(type==="accounts" && !r.name) errors.push("Account name is required");
+  if(type==="contacts"){
+    if(!r.first && !r.last) errors.push("Needs a first or last name");
+    if(r.account && !DB.accounts.some(a=>a.name.toLowerCase()===String(r.account).toLowerCase())) warnings.push(`Account "${r.account}" not found — contact left unlinked`);
+  }
+  if(type==="products"){
+    if(!r.name) errors.push("Product name is required");
+    if(r.price!==undefined && r.price!==""){ const n = Number(String(r.price).replace(/,/g,"")); if(isNaN(n)||n<0) errors.push(`Invalid price "${r.price}"`); else r.price = n; }
+  }
+  if(type==="deals"){
+    if(!r.name) errors.push("Deal name is required");
+    const amt = Number(String(r.amount||0).replace(/,/g,"")); if(isNaN(amt)||amt<0) errors.push(`Invalid amount "${r.amount}"`); else r.amount = amt;
+    if(r.stage && !PIPELINE_STAGES.includes(r.stage)){ warnings.push(`Stage "${r.stage}" not recognised — set to ${PIPELINE_STAGES[0]}`); r.stage = PIPELINE_STAGES[0]; }
+    if(!r.stage) r.stage = PIPELINE_STAGES[0];
+    if(r.closing && !/^\d{4}-\d{2}-\d{2}$/.test(r.closing)) errors.push(`Closing date "${r.closing}" must be YYYY-MM-DD`);
+    if(r.probability!==undefined && r.probability!==""){ const n = Number(r.probability); r.probability = isNaN(n) ? 20 : Math.max(0,Math.min(100,Math.round(n))); }
+    if(r.account && !DB.accounts.some(a=>a.name.toLowerCase()===String(r.account).toLowerCase())) warnings.push(`Account "${r.account}" not found — deal left unlinked`);
+  }
+  return {rec:r, errors, warnings};
+}
+(function(){
+  const baseBuild = buildImportRecord;
+  buildImportRecord = function(type, r){
+    if(type==="deals"){
+      if(!r.name) return null;
+      const acc = DB.accounts.find(a=>a.name.toLowerCase()===String(r.account||"").toLowerCase());
+      const stage = r.stage || PIPELINE_STAGES[0];
+      const closed = stage==="Closed Won"||stage==="Closed Lost";
+      return {id:uid("deal"), name:r.name, account:acc?acc.id:"", contact:"", owner:r.owner||CURRENT_USER.name, amount:Number(r.amount||0),
+        probability: r.probability!==undefined&&r.probability!=="" ? Number(r.probability) : (stage==="Closed Won"?100:stage==="Closed Lost"?0:20),
+        closing:r.closing||"", stage, type:"New Business", source:r.source||"Import", competitor:"", nextStep:r.nextStep||"", description:"",
+        created:todayISO(), stageChangedAt:todayISO(), closedAt:closed?todayISO():""};
+    }
+    return baseBuild(type, r);
+  };
+})();
+
+let importPlan = null;
+function openImport(){
+  const types = Object.keys(IMPORT_TEMPLATES).filter(k=>canManage(IMPORT_PERM[k]));
+  if(!types.length){ toast("You do not have permission to import data."); return; }
+  importPlan = null;
+  const body = `
+    <div class="field full"><label>What are you importing?</label>
+      <select id="im_type">${types.map(k=>`<option value="${k}">${k.charAt(0).toUpperCase()+k.slice(1)}</option>`).join("")}</select></div>
+    <div class="field full" style="margin-top:10px;"><label>CSV file (header row required, max ${IMPORT_MAX_ROWS} rows / 2 MB)</label><input id="im_file" type="file" accept=".csv,text/csv"></div>
+    <div class="field full" style="margin-top:10px;"><label>If a record already exists</label>
+      <select id="im_dupes"><option value="skip">Skip it (recommended)</option><option value="update">Update the existing record with the file's values</option><option value="add">Import anyway (create a duplicate)</option></select></div>
+    <div style="margin:10px 0;"><button class="btn btn-sm" onclick="downloadTemplate()">Download template CSV</button></div>
+    <div id="im_preview"></div>`;
+  openModal("Import from CSV", body, ()=>{ importStepPreview(); return false; }, "Preview");
+}
+function importStepPreview(){
+  const type = val("im_type"), file = document.getElementById("im_file").files[0];
+  if(!file){ toast("Choose a CSV file first."); return; }
+  if(file.size > IMPORT_MAX_BYTES){ toast("That file is larger than 2 MB. Split it into smaller files."); return; }
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    let rows;
+    try{ rows = parseCSV(String(reader.result).replace(/^\uFEFF/,"")); }catch(e){ toast("Could not read that CSV."); return; }
+    if(rows.length<2){ toast("That file has no data rows."); return; }
+    if(rows.length-1 > IMPORT_MAX_ROWS){ toast(`Too many rows (${rows.length-1}). The limit is ${IMPORT_MAX_ROWS} per import.`); return; }
+    importPlan = {type, header: rows[0].map(h=>h.trim()), rows: rows.slice(1), dupes: val("im_dupes")};
+    importRenderMapping();
+  };
+  reader.readAsText(file);
+}
+function importAutoMap(field, header){
+  const nk = normKey(field);
+  let i = header.findIndex(h=>normKey(h)===nk); if(i>=0) return i;
+  const syn = (IMPORT_SYNONYMS[field]||[]).map(normKey);
+  i = header.findIndex(h=>syn.includes(normKey(h))); return i;
+}
+function importRenderMapping(){
+  const p = importPlan, fields = IMPORT_TEMPLATES[p.type];
+  const opt = (i)=>`<option value="-1">— not imported —</option>` + p.header.map((h,j)=>`<option value="${j}" ${j===i?"selected":""}>${esc(h||"(blank)")}</option>`).join("");
+  document.getElementById("im_preview").innerHTML = `
+    <div style="font-weight:600;margin:12px 0 6px;">Match your columns (${p.rows.length} rows found)</div>
+    <div style="display:grid;grid-template-columns:130px 1fr;gap:6px 10px;align-items:center;max-height:220px;overflow:auto;">
+      ${fields.map(f=>`<label for="im_map_${f}" style="font-size:12px;">${esc(f)}</label><select id="im_map_${f}">${opt(importAutoMap(f,p.header))}</select>`).join("")}
+    </div>
+    <div style="margin-top:10px;"><button class="btn btn-sm btn-primary" onclick="importRunValidation()">Check data</button></div>`;
+  const b = document.getElementById("modalSaveBtn"); b.textContent = "Check data first"; b.disabled = true;
+}
+function importRunValidation(){
+  const p = importPlan, fields = IMPORT_TEMPLATES[p.type];
+  const map = {}; fields.forEach(f=>{ map[f] = Number(document.getElementById("im_map_"+f).value); });
+  const existing = new Map(); DB[p.type].forEach(r=>{ const k = existingKey(p.type,r); if(k && !existing.has(k)) existing.set(k,r); });
+  const seenInFile = new Set();
+  const out = {ok:[], dupes:[], errors:[]};
+  p.rows.forEach((row,idx)=>{
+    const raw = {}; fields.forEach(f=>{ if(map[f]>=0) raw[f] = String(row[map[f]]||"").trim(); });
+    const v = validateImportRow(p.type, raw);
+    const line = idx+2;
+    if(v.errors.length){ out.errors.push({line, row, msgs:v.errors}); return; }
+    const key = importKey(p.type, Object.assign({}, v.rec, {accountName:v.rec.account}));
+    if(key && seenInFile.has(key) && p.dupes!=="add"){ out.dupes.push({line, rec:v.rec, warnings:v.warnings, inFile:true}); return; }
+    seenInFile.add(key);
+    const ex = key ? existing.get(key) : null;
+    if(ex && p.dupes!=="add"){ out.dupes.push({line, rec:v.rec, warnings:v.warnings, existing:ex}); return; }
+    out.ok.push({line, rec:v.rec, warnings:v.warnings});
+  });
+  p.result = out;
+  const warnCount = out.ok.reduce((s,x)=>s+x.warnings.length,0);
+  const willUpdate = p.dupes==="update" ? out.dupes.filter(d=>d.existing).length : 0;
+  const preview = out.ok.slice(0,5).map(x=>`<tr>${fields.slice(0,5).map(f=>`<td>${esc(x.rec[f]===undefined?"":x.rec[f])}</td>`).join("")}</tr>`).join("");
+  document.getElementById("im_preview").insertAdjacentHTML("beforeend", `<div id="im_result" style="margin-top:14px;border-top:1px solid var(--line);padding-top:10px;">
+    <div style="font-size:13px;line-height:1.7;">
+      <b style="color:var(--good);">${out.ok.length}</b> ready to import${warnCount?` (${warnCount} adjusted)`:""}<br>
+      <b>${out.dupes.length}</b> already exist ${p.dupes==="update"?`(${willUpdate} will be updated)`:p.dupes==="skip"?"(will be skipped)":""}<br>
+      <b style="color:var(--clay);">${out.errors.length}</b> rows have errors and will be skipped
+    </div>
+    ${out.errors.slice(0,6).map(e=>`<div style="font-size:11.5px;color:var(--clay);">Row ${e.line}: ${e.msgs.map(esc).join("; ")}</div>`).join("")}
+    ${out.errors.length>6?`<div style="font-size:11.5px;color:var(--ink-soft);">…and ${out.errors.length-6} more (see the error report)</div>`:""}
+    ${(out.errors.length||out.dupes.length)?`<div style="margin-top:8px;"><button class="btn btn-sm" onclick="importDownloadReport()">Download error / duplicate report</button></div>`:""}
+    ${preview?`<div style="margin-top:10px;font-size:11.5px;color:var(--ink-soft);">Preview of first rows</div><div style="overflow:auto;"><table style="font-size:11.5px;"><thead><tr>${fields.slice(0,5).map(f=>`<th>${esc(f)}</th>`).join("")}</tr></thead><tbody>${preview}</tbody></table></div>`:""}
+  </div>`);
+  const prev = document.getElementById("im_result"); if(prev && prev.previousElementSibling && prev.previousElementSibling.id==="im_result") prev.previousElementSibling.remove();
+  const total = out.ok.length + willUpdate;
+  const b = document.getElementById("modalSaveBtn");
+  b.disabled = total===0; b.textContent = total ? `Import ${out.ok.length}${willUpdate?` + update ${willUpdate}`:""}` : "Nothing to import";
+  b.onclick = importCommit;
+}
+function importDownloadReport(){
+  const p = importPlan, out = p.result;
+  const rows = [["Row","Status","Details",...p.header]];
+  out.errors.forEach(e=>rows.push([e.line,"Error",e.msgs.join("; "),...e.row]));
+  out.dupes.forEach(d=>rows.push([d.line,d.inFile?"Duplicate in file":"Already exists","", ...Object.values(d.rec)]));
+  download(`acacia-${p.type}-import-report-${todayISO()}.csv`, toCSV(rows), "text/csv;charset=utf-8");
+}
+function importCommit(){
+  const p = importPlan; if(!p||!p.result) return;
+  const type = p.type, out = p.result;
+  if(!canManage(IMPORT_PERM[type])){ toast("You do not have permission to import data."); return; }
+  let added = 0, updated = 0;
+  out.ok.forEach(x=>{ const rec = buildImportRecord(type, x.rec); if(rec){ DB[type].push(rec); added++; } });
+  if(p.dupes==="update"){
+    out.dupes.filter(d=>d.existing).forEach(d=>{
+      const built = buildImportRecord(type, d.rec); if(!built) return;
+      const keep = {id:d.existing.id, created:d.existing.created};
+      Object.keys(built).forEach(k=>{ if(k!=="id" && k!=="created" && built[k]!=="" && built[k]!==undefined && !(type==="deals" && (k==="stageChangedAt"||k==="closedAt"))) d.existing[k] = built[k]; });
+      Object.assign(d.existing, keep); updated++;
+    });
+  }
+  save();
+  closeModal();
+  toast(`${added} ${type} imported${updated?`, ${updated} updated`:""}${out.errors.length?`, ${out.errors.length} skipped`:""}.`);
+  importPlan = null;
+  goTo(type);
+}
+
+/* ---------- form validation + duplicate warning on every modal form (M7) ---------- */
+function validateModalFields(){
+  const box = document.getElementById("modalBox"); if(!box) return true;
+  const title = (box.querySelector(".modal-head h3")||{}).textContent||"";
+  const email = box.querySelector("#f_email"), phone = box.querySelector("#f_phone"), mobile = box.querySelector("#f_mobile");
+  let ok = true;
+  const mark = (el,bad,msg)=>{ el.setAttribute("aria-invalid", bad?"true":"false"); el.style.borderColor = bad ? "var(--clay)" : ""; if(bad){ toast(msg); if(ok) el.focus(); ok = false; } };
+  if(email && email.value.trim()) mark(email, !validEmail(email.value.trim()), "Please enter a valid email address.");
+  [phone,mobile].forEach(el=>{
+    if(!el || !el.value.trim()) return;
+    const n = normalizePhone(el.value); mark(el, !n.ok, "Please enter a valid phone number, e.g. 0712 345 678 or +254712345678.");
+    if(n.ok) el.value = n.value;
+  });
+  if(!ok) return false;
+  if(/^New (Lead|Contact|Account)$/.test(title)){
+    const type = title.includes("Lead")?"leads":title.includes("Contact")?"contacts":"accounts";
+    const em = email && email.value.trim().toLowerCase(), ph = phone && phone.value.trim();
+    const nm = (box.querySelector("#f_name")||{}).value;
+    const dup = DB[type].find(r=> (em && String(r.email||"").toLowerCase()===em) || (ph && r.phone && normalizePhone(r.phone).value===ph) || (type==="accounts" && nm && String(r.name||"").trim().toLowerCase()===nm.trim().toLowerCase()));
+    if(dup){
+      const label = type==="contacts" ? ((dup.first||"")+" "+(dup.last||"")).trim() : dup.name;
+      if(!confirm(`A similar record already exists: "${label}" (same email, phone or name). Create another anyway?`)) return false;
+    }
+  }
+  return true;
+}
+(function(){
+  const baseOpen = openModal;
+  openModal = function(title, bodyHtml, onSave, saveLabel){
+    baseOpen(title, bodyHtml, onSave, saveLabel);
+    const b = document.getElementById("modalSaveBtn");
+    if(b && title!=="Import from CSV") b.onclick = ()=>{ if(!validateModalFields()) return; if(onSave()!==false) closeModal(); };
+  };
+})();
+
+
+/* =========================================================
+   LIST TOOLS: search, sort, paging, bulk actions (audit M8)
+   Works on the Leads, Accounts, Contacts and Deals tables.
+   ========================================================= */
+const LIST_VIEWS = {leads:"lead", accounts:"account", contacts:"contact", deals:"deal"};
+const listState = {};
+function listStateFor(view){ return listState[view] || (listState[view] = {q:"", col:-1, dir:1, page:1, size:25, sel:new Set()}); }
+function cellValue(tr, i){ const td = tr.children[i]; return td ? td.textContent.trim() : ""; }
+function cmpValues(a, b){
+  const num = x=>{ const n = parseFloat(String(x).replace(/[^0-9.\-]/g,"")); return (/\d/.test(x) && !isNaN(n)) ? n : NaN; };
+  const na = num(a), nb = num(b);
+  if(!isNaN(na) && !isNaN(nb) && !/[a-z]{3,}/i.test(a.replace(/KSh/i,"")) ) return na-nb;
+  const da = Date.parse(a), db = Date.parse(b);
+  if(!isNaN(da) && !isNaN(db) && /\d{4}/.test(a) && /\d{4}/.test(b)) return da-db;
+  return a.localeCompare(b, undefined, {numeric:true, sensitivity:"base"});
+}
+function enhanceList(view){
+  const type = LIST_VIEWS[view]; if(!type) return;
+  const content = document.getElementById("content");
+  const wrap = content.querySelector(".tablewrap"); const table = wrap && wrap.querySelector("table");
+  if(!table) return;
+  if(table.dataset.enhanced) return; table.dataset.enhanced = "1";
+  const tbody = table.tBodies[0]; const st = listStateFor(view);
+  const dataRows = ()=>[...tbody.querySelectorAll("tr[data-id]")];
+  if(!dataRows().length) return;
+  const canEdit = canManage(IMPORT_PERM[view]);
+  const hasOwnSearch = !!document.getElementById("leadSearchInput");
+
+  // checkbox column
+  const headRow = table.tHead.rows[0];
+  const th0 = document.createElement("th"); th0.style.width = "34px";
+  th0.innerHTML = canEdit ? `<input type="checkbox" id="listSelAll" aria-label="Select all rows">` : "";
+  headRow.insertBefore(th0, headRow.firstChild);
+  dataRows().forEach(tr=>{
+    const td = document.createElement("td"); td.setAttribute("onclick","event.stopPropagation()");
+    td.innerHTML = canEdit ? `<input type="checkbox" class="listSel" aria-label="Select row" ${st.sel.has(tr.dataset.id)?"checked":""}>` : "";
+    tr.insertBefore(td, tr.firstChild);
+  });
+
+  // toolbar
+  const bar = document.createElement("div"); bar.className = "listtools";
+  bar.innerHTML = `
+    ${hasOwnSearch ? "" : `<input type="search" id="listSearch" placeholder="Search this list…" aria-label="Search this list" value="${esc(st.q)}">`}
+    <span id="listCount" class="muted"></span>
+    <span style="flex:1"></span>
+    <label class="muted" style="display:flex;align-items:center;gap:6px;">Rows <select id="listSize" aria-label="Rows per page">${[25,50,100].map(n=>`<option ${st.size===n?"selected":""}>${n}</option>`).join("")}</select></label>
+    <button class="btn btn-sm" id="listPrev" aria-label="Previous page">‹</button>
+    <span id="listPage" class="muted"></span>
+    <button class="btn btn-sm" id="listNext" aria-label="Next page">›</button>`;
+  wrap.parentNode.insertBefore(bar, wrap);
+  const bulk = document.createElement("div"); bulk.className = "bulkbar"; bulk.id = "bulkBar"; bulk.style.display = "none";
+  wrap.parentNode.insertBefore(bulk, wrap);
+
+  // sortable headers
+  [...headRow.cells].forEach((th,i)=>{
+    if(i===0 || !th.textContent.trim()) return;
+    th.setAttribute("role","button"); th.tabIndex = 0; th.style.cursor = "pointer"; th.title = "Click to sort";
+    th.addEventListener("click", ()=>{ if(st.col===i) st.dir = -st.dir; else { st.col = i; st.dir = 1; } st.page = 1; apply(); });
+  });
+
+  function matching(){
+    const q = st.q.trim().toLowerCase();
+    return dataRows().filter(tr=> !q || tr.textContent.toLowerCase().includes(q));
+  }
+  function apply(){
+    const all = dataRows(), match = matching();
+    if(st.col>=0) match.sort((a,b)=> st.dir*cmpValues(cellValue(a,st.col), cellValue(b,st.col)));
+    const pages = Math.max(1, Math.ceil(match.length/st.size));
+    if(st.page>pages) st.page = pages;
+    const start = (st.page-1)*st.size, shown = new Set(match.slice(start, start+st.size));
+    all.forEach(tr=>{ tr.style.display = "none"; });
+    match.forEach(tr=>{ tbody.appendChild(tr); if(shown.has(tr)) tr.style.display = ""; });
+    [...headRow.cells].forEach((th,i)=>{ const old = th.querySelector(".sortmark"); if(old) old.remove(); if(i===st.col){ th.insertAdjacentHTML("beforeend", `<span class="sortmark"> ${st.dir>0?"▲":"▼"}</span>`); th.setAttribute("aria-sort", st.dir>0?"ascending":"descending"); } else th.removeAttribute("aria-sort"); });
+    let empty = tbody.querySelector(".listempty");
+    if(!match.length){ if(!empty){ empty = document.createElement("tr"); empty.className = "listempty"; empty.innerHTML = `<td colspan="${headRow.cells.length}"><div class="empty">Nothing matches your search.</div></td>`; tbody.appendChild(empty); } }
+    else if(empty) empty.remove();
+    document.getElementById("listCount").textContent = match.length===all.length ? `${all.length} records` : `${match.length} of ${all.length} records`;
+    document.getElementById("listPage").textContent = `${st.page} / ${pages}`;
+    document.getElementById("listPrev").disabled = st.page<=1; document.getElementById("listNext").disabled = st.page>=pages;
+    const selAll = document.getElementById("listSelAll");
+    if(selAll){ const ids = match.map(t=>t.dataset.id); selAll.checked = ids.length>0 && ids.every(i=>st.sel.has(i)); }
+    dataRows().forEach(tr=>{ const cb = tr.querySelector(".listSel"); if(cb) cb.checked = st.sel.has(tr.dataset.id); });
+    renderBulk();
+  }
+  function renderBulk(){
+    const ids = [...st.sel].filter(id=>dataRows().some(t=>t.dataset.id===id));
+    st.sel = new Set(ids);
+    if(!ids.length){ bulk.style.display = "none"; bulk.innerHTML = ""; return; }
+    const owners = companyUsers().map(u=>u.name);
+    const extra = type==="lead" ? `<select id="bulkStatus" aria-label="Set status"><option value="">Set status…</option>${IMPORT_LEAD_STATUSES.map(x=>`<option>${x}</option>`).join("")}</select>`
+      : type==="deal" ? `<select id="bulkStage" aria-label="Move to stage"><option value="">Move to stage…</option>${PIPELINE_STAGES.map(x=>`<option>${x}</option>`).join("")}</select>` : "";
+    bulk.style.display = "flex";
+    bulk.innerHTML = `<b>${ids.length} selected</b>
+      ${currentRole()==="Salesperson" ? "" : `<select id="bulkOwner" aria-label="Reassign owner"><option value="">Reassign to…</option>${owners.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("")}</select>`}
+      ${extra}
+      <button class="btn btn-sm" id="bulkExport">Export selected</button>
+      <button class="btn btn-sm btn-danger" id="bulkDelete">Delete</button>
+      <button class="btn btn-sm" id="bulkClear">Clear</button>`;
+    const list = DB[IMPORT_PERM[view]];
+    const recs = ()=> ids.map(id=>list.find(r=>r.id===id)).filter(Boolean);
+    const done = (msg)=>{ st.sel.clear(); save(); toast(msg); renderView(); };
+    const bo = document.getElementById("bulkOwner");
+    if(bo) bo.onchange = ()=>{ if(!bo.value) return; if(!confirm(`Reassign ${ids.length} record(s) to ${bo.value}?`)){ bo.value=""; return; } recs().forEach(r=>{ r.owner = bo.value; }); done(`Reassigned ${ids.length} to ${bo.value}.`); };
+    const bs = document.getElementById("bulkStatus");
+    if(bs) bs.onchange = ()=>{ if(!bs.value) return; recs().forEach(r=>{ r.status = bs.value; }); done(`Updated ${ids.length} lead(s).`); };
+    const bg = document.getElementById("bulkStage");
+    if(bg) bg.onchange = ()=>{ if(!bg.value) return; if(!confirm(`Move ${ids.length} deal(s) to ${bg.value}?`)){ bg.value=""; return; } recs().forEach(r=>applyStageChange(r,bg.value)); done(`Moved ${ids.length} deal(s) to ${bg.value}.`); };
+    document.getElementById("bulkClear").onclick = ()=>{ st.sel.clear(); apply(); };
+    document.getElementById("bulkExport").onclick = ()=>{
+      const heads = [...headRow.cells].slice(1).map(h=>h.textContent.replace(/[▲▼]/g,"").trim()).filter(Boolean);
+      const rows = [heads]; dataRows().filter(t=>st.sel.has(t.dataset.id)).forEach(t=>rows.push([...t.cells].slice(1,1+heads.length).map(td=>td.textContent.trim())));
+      download(`acacia-${view}-selected-${todayISO()}.csv`, toCSV(rows), "text/csv;charset=utf-8");
+    };
+    document.getElementById("bulkDelete").onclick = ()=>{
+      if(!confirm(`Delete ${ids.length} record(s)? They move to the Recycle Bin (Settings) and can be restored.`)) return;
+      let n = 0; ids.forEach(id=>{ if(deleteRecord(type, id, true)) n++; });
+      st.sel.clear(); toast(`${n} moved to Recycle Bin.`); renderView();
+    };
+  }
+
+  // events
+  const search = document.getElementById("listSearch");
+  if(search) search.addEventListener("input", ()=>{ st.q = search.value; st.page = 1; apply(); });
+  document.getElementById("listSize").onchange = e=>{ st.size = Number(e.target.value); st.page = 1; apply(); };
+  document.getElementById("listPrev").onclick = ()=>{ st.page--; apply(); };
+  document.getElementById("listNext").onclick = ()=>{ st.page++; apply(); };
+  const selAll = document.getElementById("listSelAll");
+  if(selAll) selAll.onchange = ()=>{ matching().forEach(tr=>{ selAll.checked ? st.sel.add(tr.dataset.id) : st.sel.delete(tr.dataset.id); }); apply(); };
+  tbody.addEventListener("change", e=>{ if(e.target.classList.contains("listSel")){ const id = e.target.closest("tr").dataset.id; e.target.checked ? st.sel.add(id) : st.sel.delete(id); apply(); } });
+  // leads list has its own search box that re-renders; keep our state when it does
+  if(hasOwnSearch) st.q = "";
+  apply();
+}
+(function(){
+  const base = renderView;
+  renderView = function(){ base.apply(this, arguments); try{ enhanceList(currentView); }catch(e){ console.error(e); } a11yify(document.getElementById("content")); };
+})();
+
+(function(){
+  const baseLeads = renderLeads;
+  renderLeads = function(c){ baseLeads.apply(this, arguments); try{ enhanceList("leads"); }catch(e){ console.error(e); } };
+})();
+
+
+/* =========================================================
+   NOTES, UNIFIED HISTORY, CONTACT PAGE, DEAL CONTACT ROLES
+   (audit M9, M10)
+   ========================================================= */
+const NOTE_PERM = {lead:"leads", account:"accounts", contact:"contacts", deal:"deals"};
+function escRe(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"); }
+function noteHtml(text){
+  let h = esc(text).replace(/\n/g,"<br>");
+  companyUsers().forEach(u=>{
+    if(!u.name) return;
+    const names = [u.name]; const first = u.name.split(" ")[0]; if(first && first!==u.name) names.push(first);
+    names.forEach(n=>{ h = h.replace(new RegExp("@"+escRe(esc(n))+"(?![\\w])","gi"), m=>`<span class="mention">${m}</span>`); });
+  });
+  return h;
+}
+function mentionedUsers(text){
+  const t = text.toLowerCase();
+  return companyUsers().filter(u=>{
+    if(!u.name) return false;
+    const first = u.name.split(" ")[0].toLowerCase();
+    return t.includes("@"+u.name.toLowerCase()) || (first && new RegExp("@"+escRe(first)+"(?![\\w])").test(t));
+  });
+}
+function entityLabel(type,id){
+  const r = type==="lead"?findLead(id): type==="account"?findAccount(id): type==="deal"?findDeal(id): findContact(id);
+  if(!r) return "";
+  return type==="contact" ? ((r.first||"")+" "+(r.last||"")).trim() : r.name;
+}
+function addNote(type, id){
+  if(!canManage(NOTE_PERM[type])){ toast("You do not have permission to add notes here."); return; }
+  const box = document.getElementById("noteBox"); const text = box ? box.value.trim() : "";
+  if(!text){ toast("Write a note first."); return; }
+  DB.notes = DB.notes || [];
+  DB.notes.push({id:uid("nt"), entity:id, entityType:type, text, author:CURRENT_USER.name, ts:Date.now()});
+  mentionedUsers(text).forEach(u=>{ if(u.name!==CURRENT_USER.name) notify(`${CURRENT_USER.name} mentioned you in a note on ${entityLabel(type,id)}.`, u.name); });
+  save(); renderView();
+}
+function deleteNote(nid){
+  const n = (DB.notes||[]).find(x=>x.id===nid); if(!n) return;
+  if(n.author!==CURRENT_USER.name && !isAdmin()){ toast("Only the author or an Administrator can delete a note."); return; }
+  if(!confirm("Delete this note?")) return;
+  DB.notes = DB.notes.filter(x=>x.id!==nid); save(); renderView();
+}
+function historyFor(type, id){
+  const items = [];
+  const ids = new Set([id]);
+  if(type==="account"){ DB.deals.filter(d=>d.account===id).forEach(d=>ids.add(d.id)); }
+  (DB.notes||[]).filter(n=>ids.has(n.entity)).forEach(n=>items.push({ts:n.ts, kind:"note", text:n.text, who:n.author, id:n.id, from: n.entity!==id ? entityLabel(n.entityType,n.entity) : ""}));
+  (DB.timeline||[]).filter(t=>ids.has(t.entity)).forEach(t=>items.push({ts:Date.parse(t.date)||0, kind:"event", text:t.text, date:t.date}));
+  (DB.activities||[]).filter(a=>ids.has(a.related)).forEach(a=>items.push({ts:Date.parse(a.due)||0, kind:"activity", text:`${a.kind}: ${a.title}${a.done?" — done":""}`, date:a.due, done:a.done}));
+  return items.sort((x,y)=>y.ts-x.ts);
+}
+function notesPanel(type, id){
+  const canAdd = canManage(NOTE_PERM[type]);
+  const items = historyFor(type, id);
+  const icon = {note:"📝", event:"🕘", activity:"✅"};
+  return `<div class="panel"><h3>Notes &amp; history <span class="count">(${items.length})</span></h3>
+    ${canAdd ? `<div class="notecomposer"><textarea id="noteBox" rows="2" placeholder="Add a note… use @Name to notify a teammate" aria-label="New note"></textarea><button class="btn btn-sm btn-primary" onclick="addNote('${type}','${id}')">Add note</button></div>` : ``}
+    ${items.length ? `<div class="feed">${items.map(it=>`<div class="feeditem ${it.kind}">
+      <div class="ficon" aria-hidden="true">${icon[it.kind]}</div>
+      <div class="fbody">
+        <div class="fmeta">${it.kind==="note" ? `<b>${esc(it.who)}</b> · ${esc(timeAgo(it.ts))}${it.from?` · on ${esc(it.from)}`:""}` : esc(fmtDate(it.date))}
+          ${it.kind==="note" && (it.who===CURRENT_USER.name || isAdmin()) ? `<button class="xbtn" title="Delete note" aria-label="Delete note" onclick="deleteNote('${it.id}')">✕</button>` : ``}</div>
+        <div class="ftext">${it.kind==="note" ? noteHtml(it.text) : esc(it.text)}</div>
+      </div></div>`).join("")}</div>` : `<div class="empty">Nothing here yet.</div>`}
+  </div>`;
+}
+
+/* quote and deal links for contact page */
+function renderContactDetail(c){
+  const ct = findContact(currentDetail.id);
+  if(!ct){ c.innerHTML = `<div class="empty">Contact not found.</div>`; return; }
+  const acc = findAccount(ct.account);
+  const full = ((ct.first||"")+" "+(ct.last||"")).trim();
+  const deals = DB.deals.filter(d=>d.contact===ct.id || (d.roles||[]).some(r=>r.contact===ct.id));
+  const quotes = DB.quotes.filter(q=>q.contact===ct.id);
+  const phone = ct.mobile||ct.phone||"";
+  const wa = phone ? "https://wa.me/"+phone.replace(/\D/g,"") : "";
+  c.innerHTML = `
+    <div class="backlink" onclick="goTo('contacts')" role="button" tabindex="0">← Back to Contacts</div>
+    <div class="detail-header">
+      <div class="top">
+        <div style="display:flex;gap:12px;align-items:center;"><div class="avatarsm" style="width:44px;height:44px;font-size:16px;">${esc(initials(full))}</div>
+          <div><h2>${esc(full)}</h2><div class="sub2">${esc(ct.title||"—")}${acc?` · <span class="rowlink" onclick="goTo('account-detail',{type:'account',id:'${acc.id}'})">${esc(acc.name)}</span>`:""} · Owner: ${esc(ct.owner||"—")}</div></div></div>
+        <div class="actions">
+          ${ct.email ? `<a class="btn btn-sm" href="mailto:${esc(ct.email)}">Email</a>` : ``}
+          ${phone ? `<a class="btn btn-sm" href="tel:${esc(phone)}">Call</a><a class="btn btn-sm" href="${esc(wa)}" target="_blank" rel="noopener">WhatsApp</a>` : ``}
+          ${canManage('contacts') ? `<button class="btn btn-sm" onclick="openContactForm('${ct.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteRecord('contact','${ct.id}')">Delete</button>` : ``}
+        </div>
+      </div>
+      <div class="fieldsgrid">
+        <div><div class="k">Email</div><div class="v">${esc(ct.email||"—")}</div></div>
+        <div><div class="k">Phone</div><div class="v">${esc(ct.phone||"—")}</div></div>
+        <div><div class="k">Mobile</div><div class="v">${esc(ct.mobile||"—")}</div></div>
+        <div><div class="k">Department</div><div class="v">${esc(ct.department||"—")}</div></div>
+        <div><div class="k">Account</div><div class="v">${acc?esc(acc.name):"—"}</div></div>
+        <div><div class="k">Owner</div><div class="v">${esc(ct.owner||"—")}</div></div>
+      </div>
+    </div>
+    <div class="panel"><h3>Deals <span class="count">(${deals.length})</span></h3>
+      ${listOrEmpty(deals.map(d=>{ const role = (d.roles||[]).find(r=>r.contact===ct.id); return `<div class="listrow" style="cursor:pointer" onclick="goTo('deal-detail',{type:'deal',id:'${d.id}'})"><div class="main"><div class="title rowlink">${esc(d.name)}</div><div class="meta">${esc(d.stage)} · ${fmtMoney(d.amount)}${role?` · ${esc(role.role)}`:""}</div></div></div>`; }), "No deals linked to this contact.")}
+    </div>
+    <div class="panel"><h3>Quotations <span class="count">(${quotes.length})</span></h3>
+      ${listOrEmpty(quotes.map(q=>`<div class="listrow" style="cursor:pointer" onclick="goTo('quote-detail',{type:'quote',id:'${q.id}'})"><div class="main"><div class="title rowlink">${esc(q.number)}</div><div class="meta">${esc(effectiveQuoteStatus(q))} · ${fmtMoney(Math.round(quoteTotals(q).total))}</div></div></div>`), "No quotations for this contact.")}
+    </div>
+    <div class="panel"><h3>Activities ${logActivityButtons(ct.id)}</h3>${renderRelatedActivities(ct.id)}</div>
+    ${notesPanel('contact', ct.id)}`;
+}
+
+/* multiple contacts per deal, with roles */
+const DEAL_ROLES = ["Decision maker","Influencer","Champion","Budget holder","User","Other"];
+function dealContactsPanel(d){
+  const roles = d.roles || [];
+  const can = canManage('deals');
+  const primary = findContact(d.contact);
+  return `<div class="panel"><h3>People on this deal <span class="count">(${roles.length + (primary?1:0)})</span>
+      ${can ? `<button class="btn btn-sm" style="margin-left:6px;" onclick="openDealContactForm('${d.id}')">+ Add contact</button>` : ``}</h3>
+    ${primary ? `<div class="listrow"><div class="main"><div class="title rowlink" onclick="goTo('contact-detail',{type:'contact',id:'${primary.id}'})">${esc(primary.first)} ${esc(primary.last)}</div><div class="meta">Primary contact</div></div></div>` : ``}
+    ${roles.map((r,i)=>{ const ct = findContact(r.contact); if(!ct) return ""; return `<div class="listrow"><div class="main"><div class="title rowlink" onclick="goTo('contact-detail',{type:'contact',id:'${ct.id}'})">${esc(ct.first)} ${esc(ct.last)}</div><div class="meta">${esc(r.role)}</div></div>${can?`<button class="xbtn" title="Remove" aria-label="Remove contact from deal" onclick="removeDealContact('${d.id}',${i})">✕</button>`:""}</div>`; }).join("")}
+    ${(!primary && !roles.length) ? `<div class="empty">No contacts yet.</div>` : ``}
+  </div>`;
+}
+function openDealContactForm(dealId){
+  if(!canManage('deals')){ toast("You do not have permission to change deals."); return; }
+  const d = findDeal(dealId); if(!d) return;
+  const used = new Set([d.contact, ...(d.roles||[]).map(r=>r.contact)]);
+  const opts = DB.contacts.filter(c=>!used.has(c.id));
+  const body = `<div class="formgrid">
+    <div class="field full"><label>Contact</label><select id="dc_contact"><option value="">— Choose —</option>${opts.map(c=>`<option value="${c.id}">${esc(((c.first||"")+" "+(c.last||"")).trim())}${c.account&&findAccount(c.account)?" — "+esc(findAccount(c.account).name):""}</option>`).join("")}</select></div>
+    <div class="field full"><label>Role on this deal</label><select id="dc_role">${DEAL_ROLES.map(r=>`<option>${r}</option>`).join("")}</select></div></div>`;
+  openModal("Add contact to deal", body, ()=>{
+    const cid = val("dc_contact"); if(!cid){ toast("Choose a contact."); return false; }
+    d.roles = d.roles || []; d.roles.push({contact:cid, role:val("dc_role")});
+    save(); renderView(); return true;
+  });
+}
+function removeDealContact(dealId, idx){
+  if(!canManage('deals')){ toast("You do not have permission to change deals."); return; }
+  const d = findDeal(dealId); if(!d || !d.roles) return;
+  d.roles.splice(idx,1); save(); renderView();
+}
+(function(){
+  const base = logActivityButtons;
+  logActivityButtons = function(id){
+    if(findContact(id) && !findLead(id) && !findAccount(id) && !findDeal(id)){
+      if(!canManage('activities')) return "";
+      return ["Task","Call","Meeting"].map(k=>`<button class="btn btn-sm" style="margin-left:6px;" onclick="openActivityForm('${k}',{related:'${id}',relatedType:'contact'})">+ ${k}</button>`).join("");
+    }
+    return base(id);
+  };
+})();

@@ -85,7 +85,7 @@ const USERS_KEY = "acaciaCrmUsers";
 const SESSION_KEY = "acaciaCrmSession";
 const STORAGE_KEY = "acaciaCrmData";
 const uid = (p)=> p + "_" + Math.random().toString(36).slice(2,9);
-const todayISO = ()=> new Date().toISOString().slice(0,10);
+const todayISO = ()=>{ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
 const fmtDate = (iso)=> { if(!iso) return "—"; const d=new Date(iso+"T00:00:00"); return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); };
 const fmtMoney = (n)=> "KSh " + Number(n||0).toLocaleString('en-KE');
 const daysBetween = (a,b)=> Math.round((new Date(b)-new Date(a))/86400000);
@@ -102,17 +102,29 @@ let CURRENT_USER = null;
 function dataKeyFor(companyId){ return STORAGE_KEY + "_" + companyId; }
 
 function load(companyId){
-  try{
-    const raw = localStorage.getItem(dataKeyFor(companyId));
-    if(raw) return JSON.parse(raw);
-  }catch(e){}
-  const blank = seedData();
-  localStorage.setItem(dataKeyFor(companyId), JSON.stringify(blank));
-  return blank;
+  const key = dataKeyFor(companyId);
+  let raw = null;
+  try{ raw = localStorage.getItem(key); }catch(e){}
+  if(raw){
+    try{ return JSON.parse(raw); }
+    catch(e){
+      // Never overwrite unreadable data: keep a copy and warn.
+      try{ localStorage.setItem(key+"_corrupt_"+Date.now(), raw); }catch(_){}
+      setTimeout(()=>{ try{ toast("Your saved data could not be read. A copy was kept — please contact support before adding new records."); }catch(_){} }, 500);
+      return seedData();
+    }
+  }
+  return seedData();
 }
+let SAVE_BLOCKED = false;
+let SCOPED_RENDER = false;
 function save(){
-  if(!CURRENT_USER) return;
-  localStorage.setItem(dataKeyFor(CURRENT_USER.companyId), JSON.stringify(DB));
+  if(!CURRENT_USER || !DB || SAVE_BLOCKED || SCOPED_RENDER) return;
+  try{
+    localStorage.setItem(dataKeyFor(CURRENT_USER.companyId), JSON.stringify(DB));
+  }catch(e){
+    try{ toast("Could not save: browser storage is full or unavailable. Download a backup now (Settings ▸ Backup)."); }catch(_){}
+  }
 }
 
 /* ---------- Auth ---------- */
@@ -253,7 +265,7 @@ function renderNav(){
     sec.items.forEach(it=>{
       const d = document.createElement("div");
       d.className = "navitem" + (currentView===it.id ? " active":"");
-      d.innerHTML = `<span class="dot"></span>${it.label}`;
+      d.innerHTML = `<span class="dot"></span>${esc(it.label)}`;
       d.onclick = ()=>{ goTo(it.id); if(window.innerWidth<=840) document.getElementById("sidebar").classList.remove("open"); };
       g.appendChild(d);
     });
@@ -357,7 +369,7 @@ function renderDashboard(c){
           <div class="funnel">
             ${funnelData.map(f=>`
               <div class="funnel-row">
-                <div class="funnel-label">${f.label}</div>
+                <div class="funnel-label">${esc(f.label)}</div>
                 <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:${Math.max(6,f.value/maxFunnel*100)}%"></div></div>
                 <div class="funnel-num">${f.value}</div>
               </div>`).join("")}
@@ -375,21 +387,21 @@ function renderDashboard(c){
       </div>
       <div>
         <div class="panel">
-          <h3>Today &amp; overdue tasks <span class="count">(${DB.activities.filter(a=>!a.done).length} open)</span></h3>
-          ${listOrEmpty(DB.activities.filter(a=>!a.done).sort((a,b)=>a.due.localeCompare(b.due)).slice(0,6).map(a=>`
-            <div class="listrow"><div class="main"><div class="title">${a.title}</div><div class="meta">${a.kind} · Due ${fmtDate(a.due)} · ${a.owner}</div></div></div>
-          `), "No open tasks — nice work.")}
+          <h3>Today &amp; overdue tasks <span class="count">(${DB.activities.filter(a=>!a.done && a.due<=todayISO()).length} due)</span></h3>
+          ${listOrEmpty(DB.activities.filter(a=>!a.done && a.due<=todayISO()).sort((a,b)=>a.due.localeCompare(b.due)).slice(0,6).map(a=>`
+            <div class="listrow"><div class="main"><div class="title">${esc(a.title)}</div><div class="meta">${a.kind} · Due ${fmtDate(a.due)} · ${esc(a.owner)}</div></div></div>
+          `), "Nothing due today or overdue — nice work.")}
         </div>
         <div class="panel">
           <h3>Recent leads</h3>
           ${listOrEmpty([...DB.leads].sort((a,b)=>b.created.localeCompare(a.created)).slice(0,5).map(l=>`
-            <div class="listrow"><div class="main"><div class="title">${l.name} — ${l.company}</div><div class="meta">${l.source} · <span class="pill status-${l.status}">${l.status}</span></div></div></div>
+            <div class="listrow"><div class="main"><div class="title">${esc(l.name)} — ${esc(l.company)}</div><div class="meta">${esc(l.source)} · <span class="pill status-${esc(l.status)}">${esc(l.status)}</span></div></div></div>
           `), "No leads yet.")}
         </div>
         <div class="panel">
           <h3>Deals closing soon</h3>
           ${listOrEmpty([...DB.deals].filter(d=>!d.stage.startsWith("Closed")).sort((a,b)=>a.closing.localeCompare(b.closing)).slice(0,5).map(d=>`
-            <div class="listrow"><div class="main"><div class="title">${d.name}</div><div class="meta">${fmtMoney(d.amount)} · ${fmtDate(d.closing)} · ${d.stage}</div></div></div>
+            <div class="listrow"><div class="main"><div class="title">${esc(d.name)}</div><div class="meta">${fmtMoney(d.amount)} · ${fmtDate(d.closing)} · ${esc(d.stage)}</div></div></div>
           `), "No open deals.")}
         </div>
       </div>
@@ -397,7 +409,7 @@ function renderDashboard(c){
   `;
 }
 function kpi(label,value,delta){
-  return `<div class="kpi"><div class="label">${label}</div><div class="value">${value}</div>${delta?`<div class="delta ${delta.dir}">${delta.text}</div>`:""}</div>`;
+  return `<div class="kpi"><div class="label">${label}</div><div class="value">${value}</div>${delta?`<div class="delta ${delta.dir}">${esc(delta.text)}</div>`:""}</div>`;
 }
 function listOrEmpty(rows,emptyText){
   return rows.length ? rows.join("") : `<div class="empty">${emptyText}</div>`;
@@ -405,6 +417,13 @@ function listOrEmpty(rows,emptyText){
 
 /* ---------- LEADS ---------- */
 let leadFilters = {status:"", search:""};
+function onLeadSearch(inp){
+  leadFilters.search = inp.value;
+  const pos = inp.selectionStart;
+  renderLeads(document.getElementById('content'));
+  const n = document.getElementById('leadSearchInput');
+  if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} }
+}
 function renderLeads(c){
   const base = scopeOwn(DB.leads);
   const rows = base.filter(l=>{
@@ -421,7 +440,7 @@ function renderLeads(c){
       <div class="actions">${canManage('leads') ? `<button class="btn btn-primary" onclick="openLeadForm()">+ New Lead</button>` : ``}</div>
     </div>
     <div class="tabletoolbar">
-      <input id="leadSearchInput" placeholder="Search name or company..." value="${leadFilters.search}" oninput="leadFilters.search=this.value;renderLeads(document.getElementById('content'))">
+      <input id="leadSearchInput" placeholder="Search name or company..." value="${esc(leadFilters.search)}" oninput="onLeadSearch(this)">
       <select onchange="leadFilters.status=this.value;renderLeads(document.getElementById('content'))">
         <option value="">All statuses</option>
         ${["New","Contacted","Attempted Contact","Qualified","Unqualified","Nurturing","Converted","Lost"].map(s=>`<option ${leadFilters.status===s?"selected":""}>${s}</option>`).join("")}
@@ -432,15 +451,15 @@ function renderLeads(c){
         <thead><tr><th>Name</th><th>Company</th><th>Source</th><th>Status</th><th>Score</th><th>Owner</th><th>Next Follow-up</th><th></th></tr></thead>
         <tbody>
         ${rows.length ? rows.map(l=>`
-          <tr onclick="goTo('lead-detail',{type:'lead',id:'${l.id}'})">
-            <td><span class="rowlink">${l.name}</span></td>
-            <td>${l.company}</td>
-            <td>${l.source}</td>
-            <td><span class="pill status-${l.status.replace(/ /g,'')}">${l.status}</span></td>
+          <tr data-id="${l.id}" onclick="goTo('lead-detail',{type:'lead',id:'${l.id}'})">
+            <td><span class="rowlink">${esc(l.name)}</span></td>
+            <td>${esc(l.company)}</td>
+            <td>${esc(l.source)}</td>
+            <td><span class="pill status-${esc(l.status.replace(/ /g,''))}">${esc(l.status)}</span></td>
             <td><span class="pill score-${scoreLabel(l.score)}">${l.score} · ${scoreLabelText(l.score)}</span></td>
-            <td>${l.owner}</td>
+            <td>${esc(l.owner)}</td>
             <td>${l.nextFollowup?fmtDate(l.nextFollowup):"—"}</td>
-            <td onclick="event.stopPropagation()">${canManage('leads') ? `<button class="btn btn-sm" onclick="openLeadForm('${l.id}')">Edit</button>` : ``}</td>
+            <td onclick="event.stopPropagation()">${canManage('leads') ? `<button class="btn btn-sm" onclick="openLeadForm('${l.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteRecord('lead','${l.id}')">Delete</button>` : ``}</td>
           </tr>
         `).join("") : `<tr><td colspan="8"><div class="empty">No leads match this filter.</div></td></tr>`}
         </tbody>
@@ -457,29 +476,30 @@ function renderLeadDetail(c){
     <div class="detail-header">
       <div class="top">
         <div>
-          <h2>${l.name}</h2>
-          <div class="sub2">${l.title||""} at ${l.company} · <span class="pill status-${l.status.replace(/ /g,'')}">${l.status}</span> <span class="pill score-${scoreLabel(l.score)}">${scoreLabelText(l.score)} (${l.score})</span></div>
+          <h2>${esc(l.name)}</h2>
+          <div class="sub2">${esc(l.title||"")} at ${esc(l.company)} · <span class="pill status-${esc(l.status.replace(/ /g,''))}">${esc(l.status)}</span> <span class="pill score-${scoreLabel(l.score)}">${scoreLabelText(l.score)} (${l.score})</span></div>
         </div>
         <div class="actions">
-          <button class="btn btn-sm" onclick="openLeadForm('${l.id}')">Edit</button>
-          ${l.status!=="Converted" ? `<button class="btn btn-gold btn-sm" onclick="convertLead('${l.id}')">Convert Lead</button>` : `<span class="pill status-Converted">Converted</span>`}
+          ${canManage('leads') ? `<button class="btn btn-sm" onclick="openLeadForm('${l.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteRecord('lead','${l.id}')">Delete</button>` : ``}
+          ${l.status!=="Converted" ? (canManage('leads') ? `<button class="btn btn-gold btn-sm" onclick="convertLead('${l.id}')">Convert Lead</button>` : ``) : `<span class="pill status-Converted">Converted</span>`}
         </div>
       </div>
       <div class="fieldsgrid">
-        <div><div class="k">Email</div><div class="v">${l.email||"—"}</div></div>
-        <div><div class="k">Phone</div><div class="v">${l.phone||"—"}</div></div>
-        <div><div class="k">Mobile</div><div class="v">${l.mobile||"—"}</div></div>
-        <div><div class="k">Industry</div><div class="v">${l.industry||"—"}</div></div>
-        <div><div class="k">Country / County</div><div class="v">${l.country||"—"} ${l.county?"/ "+l.county:""}</div></div>
-        <div><div class="k">Lead Source</div><div class="v">${l.source}</div></div>
-        <div><div class="k">Lead Owner</div><div class="v">${l.owner}</div></div>
+        <div><div class="k">Email</div><div class="v">${esc(l.email||"—")}</div></div>
+        <div><div class="k">Phone</div><div class="v">${esc(l.phone||"—")}</div></div>
+        <div><div class="k">Mobile</div><div class="v">${esc(l.mobile||"—")}</div></div>
+        <div><div class="k">Industry</div><div class="v">${esc(l.industry||"—")}</div></div>
+        <div><div class="k">Country / County</div><div class="v">${esc(l.country||"—")} ${esc(l.county?"/ "+l.county:"")}</div></div>
+        <div><div class="k">Lead Source</div><div class="v">${esc(l.source)}</div></div>
+        <div><div class="k">Lead Owner</div><div class="v">${esc(l.owner)}</div></div>
         <div><div class="k">Expected Revenue</div><div class="v">${fmtMoney(l.revenue)}</div></div>
         <div><div class="k">Created</div><div class="v">${fmtDate(l.created)}</div></div>
         <div><div class="k">Last Contacted</div><div class="v">${l.lastContacted?fmtDate(l.lastContacted):"—"}</div></div>
         <div><div class="k">Next Follow-up</div><div class="v">${l.nextFollowup?fmtDate(l.nextFollowup):"—"}</div></div>
       </div>
     </div>
-    <div class="panel"><h3>Activities</h3>${renderRelatedActivities(l.id)}</div>
+    <div class="panel"><h3>Activities ${logActivityButtons(l.id)}</h3>${renderRelatedActivities(l.id)}</div>
+    ${notesPanel('lead', l.id)}
   `;
 }
 
@@ -487,18 +507,18 @@ function openLeadForm(id){
   const l = id ? findLead(id) : null;
   const body = `
     <div class="formgrid">
-      <div class="field"><label>Full name</label><input id="f_name" value="${l?l.name:''}"></div>
-      <div class="field"><label>Company</label><input id="f_company" value="${l?l.company:''}"></div>
-      <div class="field"><label>Job title</label><input id="f_title" value="${l?l.title:''}"></div>
-      <div class="field"><label>Industry</label><input id="f_industry" value="${l?l.industry:''}"></div>
-      <div class="field"><label>Email</label><input id="f_email" value="${l?l.email:''}"></div>
-      <div class="field"><label>Phone</label><input id="f_phone" value="${l?l.phone:''}"></div>
-      <div class="field"><label>County</label><input id="f_county" value="${l?l.county:''}"></div>
+      <div class="field"><label>Full name</label><input id="f_name" value="${esc(l?l.name:'')}"></div>
+      <div class="field"><label>Company</label><input id="f_company" value="${esc(l?l.company:'')}"></div>
+      <div class="field"><label>Job title</label><input id="f_title" value="${esc(l?l.title:'')}"></div>
+      <div class="field"><label>Industry</label><input id="f_industry" value="${esc(l?l.industry:'')}"></div>
+      <div class="field"><label>Email</label><input id="f_email" value="${esc(l?l.email:'')}"></div>
+      <div class="field"><label>Phone</label><input id="f_phone" value="${esc(l?l.phone:'')}"></div>
+      <div class="field"><label>County</label><input id="f_county" value="${esc(l?l.county:'')}"></div>
       <div class="field"><label>Lead source</label><select id="f_source">${["Website","Google","Facebook","LinkedIn","Referral","Phone","Email","Exhibition","Advertisement","Existing Customer","Manual Entry"].map(s=>`<option ${l&&l.source===s?"selected":""}>${s}</option>`).join("")}</select></div>
-      <div class="field"><label>Status</label><select id="f_status">${["New","Contacted","Attempted Contact","Qualified","Unqualified","Nurturing","Converted","Lost"].map(s=>`<option ${l&&l.status===s?"selected":""}>${s}</option>`).join("")}</select></div>
+      <div class="field"><label>Status</label><select id="f_status">${["New","Contacted","Attempted Contact","Qualified","Unqualified","Nurturing",...(l&&l.status==="Converted"?["Converted"]:[]),"Lost"].map(s=>`<option ${l&&l.status===s?"selected":""}>${s}</option>`).join("")}</select></div>
       <div class="field"><label>Lead score (0–100)</label><input id="f_score" type="number" min="0" max="100" value="${l?l.score:20}"></div>
       <div class="field"><label>Expected revenue (KSh)</label><input id="f_revenue" type="number" value="${l?l.revenue:0}"></div>
-      <div class="field"><label>Owner</label><input id="f_owner" value="${l?l.owner:CURRENT_USER.name}"></div>
+      <div class="field"><label>Owner</label>${ownerSelect("f_owner", l?l.owner:CURRENT_USER.name)}</div>
       <div class="field"><label>Next follow-up</label><input id="f_next" type="date" value="${l?l.nextFollowup:''}"></div>
     </div>
   `;
@@ -510,6 +530,7 @@ function openLeadForm(id){
       owner:val('f_owner'), nextFollowup:val('f_next'), lastContacted:l?l.lastContacted:""
     };
     if(!data.name){ toast("Please enter a name."); return false; }
+    if(!canManage('leads')){ toast("You do not have permission to change leads."); return false; }
     if(l){ Object.assign(l,data); notify(`Lead updated: ${data.name}`); }
     else { data.id = uid("lead"); data.created = todayISO(); DB.leads.push(data); notify(`New lead created: ${data.name}`); }
     save();
@@ -519,25 +540,37 @@ function openLeadForm(id){
 }
 
 function convertLead(id){
+  if(!canManage('leads')){ toast("You do not have permission to convert leads."); return; }
   const l = findLead(id);
   if(!l) return;
   openModal("Convert Lead", `
-    <p style="margin-top:0;font-size:13.5px;color:var(--ink-soft);">Converting <strong>${l.name}</strong> will create an Account, a Contact, and a Deal — then mark the lead as Converted.</p>
+    <p style="margin-top:0;font-size:13.5px;color:var(--ink-soft);">Converting <strong>${esc(l.name)}</strong> will create an Account, a Contact, and a Deal — then mark the lead as Converted.</p>
     <div class="formgrid">
-      <div class="field full"><label>Account name</label><input id="cv_account" value="${l.company}"></div>
-      <div class="field full"><label>Deal name</label><input id="cv_deal" value="${l.company} — Initial Deal"></div>
+      <div class="field full"><label>Account name</label><input id="cv_account" value="${esc(l.company)}"></div>
+      <div class="field full"><label>Deal name</label><input id="cv_deal" value="${esc(l.company)} — Initial Deal"></div>
       <div class="field"><label>Deal amount (KSh)</label><input id="cv_amount" type="number" value="${l.revenue}"></div>
       <div class="field"><label>Deal stage</label><select id="cv_stage">${["Qualification","Needs Analysis","Proposal","Negotiation"].map(s=>`<option>${s}</option>`).join("")}</select></div>
     </div>
   `, ()=>{
-    const accId = uid("acc");
+    const typedName = val('cv_account').trim();
+    if(!typedName){ toast("Account name is required."); return false; }
+    const existing = DB.accounts.find(x=>x.name.trim().toLowerCase()===typedName.toLowerCase());
+    let accId;
+    if(existing && confirm(`An account named "${existing.name}" already exists. Attach this lead to it instead of creating a duplicate?`)){
+      accId = existing.id;
+    } else {
+      accId = uid("acc");
+      DB.accounts.push({id:accId, name:typedName, industry:l.industry, website:l.website, phone:l.phone, email:l.email, address:l.county, country:l.country, employees:"", revenue:l.revenue, owner:l.owner, type:"Prospect", status:"Active", created:todayISO()});
+    }
     const conId = uid("con");
     const dealId = uid("deal");
     const nameParts = l.name.split(" ");
-    DB.accounts.push({id:accId, name:val('cv_account'), industry:l.industry, website:l.website, phone:l.phone, email:l.email, address:l.county, country:l.country, employees:"", revenue:l.revenue, owner:l.owner, type:"Prospect", status:"Active", created:todayISO()});
     DB.contacts.push({id:conId, first:nameParts[0]||l.name, last:nameParts.slice(1).join(" "), title:l.title, account:accId, email:l.email, phone:l.phone, mobile:l.mobile, department:"", owner:l.owner, source:l.source});
-    DB.deals.push({id:dealId, name:val('cv_deal'), account:accId, contact:conId, owner:l.owner, amount:Number(val('cv_amount')||0), probability:20, closing:"", stage:val('cv_stage'), type:"New Business", source:l.source, competitor:"", nextStep:"", description:`Converted from lead ${l.name}.`, created:todayISO()});
+    DB.deals.push({id:dealId, name:val('cv_deal'), account:accId, contact:conId, owner:l.owner, amount:Number(val('cv_amount')||0), probability:20, closing:"", stage:val('cv_stage'), type:"New Business", source:l.source, competitor:"", nextStep:"", description:`Converted from lead ${l.name}.`, created:todayISO(), stageChangedAt:todayISO()});
     l.status = "Converted";
+    l.convertedAccountId = accId; l.convertedContactId = conId; l.convertedDealId = dealId; l.convertedAt = todayISO();
+    DB.activities.forEach(x=>{ if(x.related===l.id && x.relatedType==="lead"){ x.related = dealId; x.relatedType = "deal"; } });
+    (DB.notes||[]).forEach(n=>{ if(n.entity===l.id){ n.entity = dealId; n.entityType = "deal"; } });
     addTimeline(accId,"account", `Lead converted from ${l.name}`);
     notify(`Lead converted: ${l.name} → Account, Contact & Deal created`);
     save();
@@ -594,14 +627,14 @@ function renderAccounts(c){
         <thead><tr><th>Account</th><th>Industry</th><th>Owner</th><th>Type</th><th>Contacts</th><th>Open Deals</th><th>Status</th></tr></thead>
         <tbody>
         ${rows.map(a=>`
-          <tr onclick="goTo('account-detail',{type:'account',id:'${a.id}'})">
-            <td><span class="rowlink">${a.name}</span></td>
-            <td>${a.industry||"—"}</td>
-            <td>${a.owner}</td>
-            <td>${a.type}</td>
+          <tr data-id="${a.id}" onclick="goTo('account-detail',{type:'account',id:'${a.id}'})">
+            <td><span class="rowlink">${esc(a.name)}</span></td>
+            <td>${esc(a.industry||"—")}</td>
+            <td>${esc(a.owner)}</td>
+            <td>${esc(a.type)}</td>
             <td>${accountContacts(a.id).length}</td>
             <td>${accountDeals(a.id).filter(d=>!d.stage.startsWith("Closed")).length}</td>
-            <td><span class="pill status-Qualified">${a.status}</span></td>
+            <td><span class="pill st-${esc(String(a.status).replace(/\s+/g,''))}">${esc(a.status)}</span></td>
           </tr>
         `).join("")}
         </tbody>
@@ -622,8 +655,8 @@ function renderAccountDetail(c){
     <div class="backlink" onclick="goTo('accounts')">← Back to Accounts</div>
     <div class="detail-header">
       <div class="top">
-        <div><h2>${a.name}</h2><div class="sub2">${a.industry||"—"} · ${a.country||""} · Owner: ${a.owner}</div></div>
-        <div class="actions">${canManage('accounts') ? `<button class="btn btn-sm" onclick="openAccountForm('${a.id}')">Edit</button>` : ``}</div>
+        <div><h2>${esc(a.name)}</h2><div class="sub2">${esc(a.industry||"—")} · ${esc(a.country||"")} · Owner: ${esc(a.owner)}</div></div>
+        <div class="actions">${canManage('accounts') ? `<button class="btn btn-sm" onclick="openAccountForm('${a.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteRecord('account','${a.id}')">Delete</button>` : ``}</div>
       </div>
     </div>
     <div class="tabs">${tabs.map(t=>`<div class="tab ${accountDetailTab===t?'active':''}" onclick="accountDetailTab='${t}';renderView()">${t.charAt(0).toUpperCase()+t.slice(1)}</div>`).join("")}</div>
@@ -632,45 +665,43 @@ function renderAccountDetail(c){
   const body = document.getElementById("accTabBody");
   if(accountDetailTab==="overview"){
     body.innerHTML = `<div class="panel"><h3>Account profile</h3><div class="fieldsgrid">
-      <div><div class="k">Website</div><div class="v">${a.website||"—"}</div></div>
-      <div><div class="k">Phone</div><div class="v">${a.phone||"—"}</div></div>
-      <div><div class="k">Email</div><div class="v">${a.email||"—"}</div></div>
-      <div><div class="k">Address</div><div class="v">${a.address||"—"}</div></div>
+      <div><div class="k">Website</div><div class="v">${esc(a.website||"—")}</div></div>
+      <div><div class="k">Phone</div><div class="v">${esc(a.phone||"—")}</div></div>
+      <div><div class="k">Email</div><div class="v">${esc(a.email||"—")}</div></div>
+      <div><div class="k">Address</div><div class="v">${esc(a.address||"—")}</div></div>
       <div><div class="k">Employees</div><div class="v">${a.employees||"—"}</div></div>
       <div><div class="k">Annual Revenue</div><div class="v">${fmtMoney(a.revenue)}</div></div>
-      <div><div class="k">Account Type</div><div class="v">${a.type}</div></div>
-      <div><div class="k">Status</div><div class="v">${a.status}</div></div>
+      <div><div class="k">Account Type</div><div class="v">${esc(a.type)}</div></div>
+      <div><div class="k">Status</div><div class="v">${esc(a.status)}</div></div>
       <div><div class="k">Created</div><div class="v">${fmtDate(a.created)}</div></div>
     </div></div>`;
   } else if(accountDetailTab==="contacts"){
     body.innerHTML = `<div class="panel"><h3>Contacts <span class="count">(${conts.length})</span></h3>
-      ${listOrEmpty(conts.map(ct=>`<div class="listrow"><div class="avatarsm">${initials(ct.first+' '+ct.last)}</div><div class="main"><div class="title">${ct.first} ${ct.last} — ${ct.title}</div><div class="meta">${ct.email} · ${ct.phone}</div></div></div>`),"No contacts linked yet.")}
+      ${listOrEmpty(conts.map(ct=>`<div class="listrow"><div class="avatarsm">${esc(initials(ct.first+' '+ct.last))}</div><div class="main"><div class="title">${esc(ct.first)} ${esc(ct.last)} — ${esc(ct.title)}</div><div class="meta">${esc(ct.email)} · ${esc(ct.phone)}</div></div></div>`),"No contacts linked yet.")}
     </div>`;
   } else if(accountDetailTab==="deals"){
     body.innerHTML = `<div class="panel"><h3>Deals <span class="count">(${dls.length})</span></h3>
-      ${listOrEmpty(dls.map(d=>`<div class="listrow" style="cursor:pointer" onclick="goTo('deal-detail',{type:'deal',id:'${d.id}'})"><div class="main"><div class="title rowlink">${d.name}</div><div class="meta">${fmtMoney(d.amount)} · ${d.stage}</div></div></div>`),"No deals yet.")}
+      ${listOrEmpty(dls.map(d=>`<div class="listrow" style="cursor:pointer" onclick="goTo('deal-detail',{type:'deal',id:'${d.id}'})"><div class="main"><div class="title rowlink">${esc(d.name)}</div><div class="meta">${fmtMoney(d.amount)} · ${esc(d.stage)}</div></div></div>`),"No deals yet.")}
     </div>`;
   } else if(accountDetailTab==="activities"){
-    body.innerHTML = `<div class="panel"><h3>Activities</h3>${renderRelatedActivities(a.id)}</div>`;
+    body.innerHTML = `<div class="panel"><h3>Activities ${logActivityButtons(a.id)}</h3>${renderRelatedActivities(a.id)}</div>`;
   } else if(accountDetailTab==="timeline"){
-    body.innerHTML = `<div class="panel"><h3>Customer timeline</h3><div class="timeline">
-      ${tls.length? tls.map(t=>`<div class="tl-item"><div class="tl-date">${fmtDate(t.date)}</div><div class="tl-text">${t.text}</div></div>`).join("") : `<div class="empty">No timeline events yet.</div>`}
-    </div></div>`;
+    body.innerHTML = notesPanel('account', a.id);
   }
 }
 
 function openAccountForm(id){
   const a = id?findAccount(id):null;
   const body = `<div class="formgrid">
-    <div class="field full"><label>Company name</label><input id="f_name" value="${a?a.name:''}"></div>
-    <div class="field"><label>Industry</label><input id="f_industry" value="${a?a.industry:''}"></div>
-    <div class="field"><label>Website</label><input id="f_website" value="${a?a.website:''}"></div>
-    <div class="field"><label>Phone</label><input id="f_phone" value="${a?a.phone:''}"></div>
-    <div class="field"><label>Email</label><input id="f_email" value="${a?a.email:''}"></div>
-    <div class="field"><label>Address</label><input id="f_address" value="${a?a.address:''}"></div>
+    <div class="field full"><label>Company name</label><input id="f_name" value="${esc(a?a.name:'')}"></div>
+    <div class="field"><label>Industry</label><input id="f_industry" value="${esc(a?a.industry:'')}"></div>
+    <div class="field"><label>Website</label><input id="f_website" value="${esc(a?a.website:'')}"></div>
+    <div class="field"><label>Phone</label><input id="f_phone" value="${esc(a?a.phone:'')}"></div>
+    <div class="field"><label>Email</label><input id="f_email" value="${esc(a?a.email:'')}"></div>
+    <div class="field"><label>Address</label><input id="f_address" value="${esc(a?a.address:'')}"></div>
     <div class="field"><label>Employees</label><input id="f_employees" value="${a?a.employees:''}"></div>
     <div class="field"><label>Annual revenue (KSh)</label><input id="f_revenue" type="number" value="${a?a.revenue:0}"></div>
-    <div class="field"><label>Owner</label><input id="f_owner" value="${a?a.owner:CURRENT_USER.name}"></div>
+    <div class="field"><label>Owner</label>${ownerSelect("f_owner", a?a.owner:CURRENT_USER.name)}</div>
     <div class="field"><label>Account type</label><select id="f_type">${["Prospect","Customer","Partner"].map(s=>`<option ${a&&a.type===s?"selected":""}>${s}</option>`).join("")}</select></div>
   </div>`;
   openModal(a?"Edit Account":"New Account", body, ()=>{
@@ -693,39 +724,45 @@ function renderContacts(c){
       <div class="actions">${canManage('contacts') ? `<button class="btn btn-primary" onclick="openContactForm()">+ New Contact</button>` : ``}</div>
     </div>
     <div class="tablewrap"><table>
-      <thead><tr><th>Name</th><th>Title</th><th>Account</th><th>Email</th><th>Phone</th><th>Owner</th></tr></thead>
+      <thead><tr><th>Name</th><th>Title</th><th>Account</th><th>Email</th><th>Phone</th><th>Owner</th><th></th></tr></thead>
       <tbody>
       ${rows.map(ct=>{
         const acc = findAccount(ct.account);
-        return `<tr onclick="${acc?`goTo('account-detail',{type:'account',id:'${acc.id}'})`:''}">
-          <td><div style="display:flex;align-items:center;gap:8px;"><div class="avatarsm">${initials(ct.first+' '+ct.last)}</div>${ct.first} ${ct.last}</div></td>
-          <td>${ct.title||"—"}</td>
-          <td>${acc?`<span class="rowlink">${acc.name}</span>`:"—"}</td>
-          <td>${ct.email||"—"}</td>
-          <td>${ct.phone||"—"}</td>
-          <td>${ct.owner||"—"}</td>
+        return `<tr data-id="${ct.id}" onclick="goTo('contact-detail',{type:'contact',id:'${ct.id}'})">
+          <td><div style="display:flex;align-items:center;gap:8px;"><div class="avatarsm">${esc(initials(ct.first+' '+ct.last))}</div><span class="rowlink">${esc(ct.first)} ${esc(ct.last)}</span></div></td>
+          <td>${esc(ct.title||"—")}</td>
+          <td>${acc?`<span class="rowlink">${esc(acc.name)}</span>`:"—"}</td>
+          <td>${esc(ct.email||"—")}</td>
+          <td>${esc(ct.phone||"—")}</td>
+          <td>${esc(ct.owner||"—")}</td>
+          <td onclick="event.stopPropagation()" style="white-space:nowrap;">${canManage('contacts') ? `<button class="btn btn-sm" onclick="openContactForm('${ct.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteRecord('contact','${ct.id}')">Delete</button>` : ``}</td>
         </tr>`;
       }).join("")}
       </tbody>
     </table></div>
   `;
 }
-function openContactForm(){
+function openContactForm(id){
+  if(!canManage('contacts')){ toast("You do not have permission to change contacts."); return; }
+  const c = id ? findContact(id) : null;
   const body = `<div class="formgrid">
-    <div class="field"><label>First name</label><input id="f_first"></div>
-    <div class="field"><label>Last name</label><input id="f_last"></div>
-    <div class="field"><label>Title</label><input id="f_title"></div>
-    <div class="field"><label>Account</label><select id="f_account"><option value="">— None —</option>${DB.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join("")}</select></div>
-    <div class="field"><label>Email</label><input id="f_email"></div>
-    <div class="field"><label>Phone</label><input id="f_phone"></div>
-    <div class="field"><label>Department</label><input id="f_department"></div>
-    <div class="field"><label>Owner</label><input id="f_owner" value="${CURRENT_USER.name}"></div>
+    <div class="field"><label>First name</label><input id="f_first" value="${esc(c?c.first:'')}"></div>
+    <div class="field"><label>Last name</label><input id="f_last" value="${esc(c?c.last:'')}"></div>
+    <div class="field"><label>Title</label><input id="f_title" value="${esc(c?c.title:'')}"></div>
+    <div class="field"><label>Account</label><select id="f_account"><option value="">— None —</option>${DB.accounts.map(a=>`<option value="${a.id}" ${c&&c.account===a.id?"selected":""}>${esc(a.name)}</option>`).join("")}</select></div>
+    <div class="field"><label>Email</label><input id="f_email" type="email" value="${esc(c?c.email:'')}"></div>
+    <div class="field"><label>Phone</label><input id="f_phone" value="${esc(c?c.phone:'')}"></div>
+    <div class="field"><label>Mobile</label><input id="f_mobile" value="${esc(c?(c.mobile||''):'')}"></div>
+    <div class="field"><label>Department</label><input id="f_department" value="${esc(c?c.department:'')}"></div>
+    <div class="field"><label>Owner</label>${ownerSelect("f_owner", c?c.owner:CURRENT_USER.name)}</div>
   </div>`;
-  openModal("New Contact", body, ()=>{
+  openModal(c?"Edit Contact":"New Contact", body, ()=>{
     const first = val('f_first');
     if(!first){ toast("First name is required."); return false; }
-    DB.contacts.push({id:uid("con"), first, last:val('f_last'), title:val('f_title'), account:val('f_account'), email:val('f_email'), phone:val('f_phone'), mobile:val('f_phone'), department:val('f_department'), owner:val('f_owner'), source:"Manual Entry"});
-    save(); notify(`New contact created: ${first} ${val('f_last')}`);
+    const data = {first, last:val('f_last'), title:val('f_title'), account:val('f_account'), email:val('f_email'), phone:val('f_phone'), mobile:val('f_mobile')||val('f_phone'), department:val('f_department'), owner:val('f_owner')};
+    if(c){ Object.assign(c,data); notify(`Contact updated: ${first} ${data.last}`); }
+    else { data.id=uid("con"); DB.contacts.push(data); notify(`New contact created: ${first} ${data.last}`); }
+    save();
     goTo("contacts");
     return true;
   });
@@ -744,14 +781,14 @@ function renderDealsList(c){
       <tbody>
       ${rows.map(d=>{
         const acc = findAccount(d.account);
-        return `<tr onclick="goTo('deal-detail',{type:'deal',id:'${d.id}'})">
-          <td><span class="rowlink">${d.name}</span></td>
-          <td>${acc?acc.name:"—"}</td>
+        return `<tr data-id="${d.id}" onclick="goTo('deal-detail',{type:'deal',id:'${d.id}'})">
+          <td><span class="rowlink">${esc(d.name)}</span></td>
+          <td>${esc(acc?acc.name:"—")}</td>
           <td>${fmtMoney(d.amount)}</td>
-          <td><span class="pill status-Qualified">${d.stage}</span></td>
+          <td><span class="pill st-${esc(String(d.stage).replace(/\s+/g,''))}">${esc(d.stage)}</span></td>
           <td>${d.probability}%</td>
           <td>${d.closing?fmtDate(d.closing):"—"}</td>
-          <td>${d.owner}</td>
+          <td>${esc(d.owner)}</td>
         </tr>`;
       }).join("")}
       </tbody>
@@ -768,44 +805,62 @@ function renderDealDetail(c){
     <div class="backlink" onclick="goTo('deals')">← Back to Deals</div>
     <div class="detail-header">
       <div class="top">
-        <div><h2>${d.name}</h2><div class="sub2">${fmtMoney(d.amount)} · <span class="pill status-Qualified">${d.stage}</span> · ${d.probability}% probability</div></div>
+        <div><h2>${esc(d.name)}</h2><div class="sub2">${fmtMoney(d.amount)} · <span class="pill st-${esc(String(d.stage).replace(/\s+/g,''))}">${esc(d.stage)}</span> · ${d.probability}% probability</div></div>
         <div class="actions">
           <select onchange="updateDealStage('${d.id}',this.value)" class="btn btn-sm" style="border:1px solid var(--line)" ${canManage('deals')?'':'disabled'}>
             ${PIPELINE_STAGES.map(s=>`<option ${s===d.stage?"selected":""}>${s}</option>`).join("")}
           </select>
           <button class="btn btn-sm" onclick="openDealForm('${d.id}')" ${canManage('deals')?'':'disabled'}>Edit</button>
+          ${canManage('deals') ? `<button class="btn btn-sm btn-danger" onclick="deleteRecord('deal','${d.id}')">Delete</button>` : ``}
         </div>
       </div>
       <div class="fieldsgrid">
-        <div><div class="k">Account</div><div class="v">${acc?`<span class="rowlink" onclick="goTo('account-detail',{type:'account',id:'${acc.id}'})">${acc.name}</span>`:"—"}</div></div>
-        <div><div class="k">Contact</div><div class="v">${cont?cont.first+' '+cont.last:"—"}</div></div>
-        <div><div class="k">Owner</div><div class="v">${d.owner}</div></div>
+        <div><div class="k">Account</div><div class="v">${acc?`<span class="rowlink" onclick="goTo('account-detail',{type:'account',id:'${acc.id}'})">${esc(acc.name)}</span>`:"—"}</div></div>
+        <div><div class="k">Contact</div><div class="v">${cont?`<span class="rowlink" onclick="goTo('contact-detail',{type:'contact',id:'${cont.id}'})">${esc(cont.first)} ${esc(cont.last)}</span>`:"—"}</div></div>
+        <div><div class="k">Owner</div><div class="v">${esc(d.owner)}</div></div>
         <div><div class="k">Closing Date</div><div class="v">${d.closing?fmtDate(d.closing):"—"}</div></div>
-        <div><div class="k">Deal Type</div><div class="v">${d.type}</div></div>
-        <div><div class="k">Lead Source</div><div class="v">${d.source}</div></div>
-        <div><div class="k">Competitor</div><div class="v">${d.competitor||"—"}</div></div>
-        <div><div class="k">Next Step</div><div class="v">${d.nextStep||"—"}</div></div>
+        <div><div class="k">Deal Type</div><div class="v">${esc(d.type)}</div></div>
+        <div><div class="k">Lead Source</div><div class="v">${esc(d.source)}</div></div>
+        <div><div class="k">Competitor</div><div class="v">${esc(d.competitor||"—")}</div></div>
+        <div><div class="k">Next Step</div><div class="v">${esc(d.nextStep||"—")}</div></div>
         <div><div class="k">Created</div><div class="v">${fmtDate(d.created)}</div></div>
       </div>
-      ${d.description?`<div style="margin-top:12px;font-size:13px;color:var(--ink-soft)">${d.description}</div>`:""}
+      ${d.description?`<div style="margin-top:12px;font-size:13px;color:var(--ink-soft)">${esc(d.description)}</div>`:""}
     </div>
-    <div class="panel"><h3>Activities</h3>${renderRelatedActivities(d.id)}</div>
+    ${dealContactsPanel(d)}
+    <div class="panel"><h3>Activities ${logActivityButtons(d.id)}</h3>${renderRelatedActivities(d.id)}</div>
+    ${notesPanel('deal', d.id)}
   `;
 }
 
-function updateDealStage(id, stage){
-  const d = findDeal(id);
+const STAGE_PROB = {"Prospecting":10,"Qualification":20,"Proposal":50,"Negotiation":80,"Closed Won":100,"Closed Lost":0};
+function applyStageChange(d, stage){
   const prev = d.stage;
+  if(prev === stage) return false;
   d.stage = stage;
-  if(stage==="Closed Won") d.probability=100;
-  if(stage==="Closed Lost") d.probability=0;
-  addTimeline(d.account||d.id, d.account?"account":"deal", `Deal "${d.name}" moved ${prev} → ${stage}`);
+  d.stageChangedAt = todayISO();
+  if(STAGE_PROB[stage] !== undefined && (stage==="Closed Won" || stage==="Closed Lost")) d.probability = STAGE_PROB[stage];
+  if(stage==="Closed Won" || stage==="Closed Lost"){ d.closedAt = todayISO(); }
+  else { d.closedAt = ""; if(prev==="Closed Lost") d.lostReason = ""; }
+  addTimeline(d.account||d.id, d.account?"account":"deal", `Deal "${d.name}" moved ${prev||"New"} → ${stage}`);
   if(stage==="Closed Won"){
-    DB.activities.push({id:uid("act"), kind:"Task", title:`Create customer onboarding plan for ${d.name}`, related:d.id, relatedType:"deal", due:todayISO(), owner:d.owner, done:false});
+    const exists = DB.activities.some(x=>x.related===d.id && x.relatedType==="deal" && x.autoKey==="onboarding");
+    if(!exists) DB.activities.push({id:uid("act"), kind:"Task", title:`Create customer onboarding plan for ${d.name}`, related:d.id, relatedType:"deal", due:todayISO(), owner:d.owner, done:false, autoKey:"onboarding"});
     notify(`Deal Closed Won: ${d.name}`);
   } else if(stage==="Closed Lost"){
     notify(`Deal Closed Lost: ${d.name}`);
   }
+  return true;
+}
+function updateDealStage(id, stage){
+  if(!canManage('deals')){ toast("You do not have permission to change deals."); renderView(); return; }
+  const d = findDeal(id);
+  if(!d) return;
+  if(stage==="Closed Lost" && !d.lostReason){
+    const r = prompt("Why was this deal lost? (optional)", "");
+    if(r) d.lostReason = r.trim();
+  }
+  applyStageChange(d, stage);
   save();
   renderView();
 }
@@ -813,23 +868,30 @@ function updateDealStage(id, stage){
 function openDealForm(id){
   const d = id?findDeal(id):null;
   const body = `<div class="formgrid">
-    <div class="field full"><label>Deal name</label><input id="f_name" value="${d?d.name:''}"></div>
-    <div class="field"><label>Account</label><select id="f_account"><option value="">— None —</option>${DB.accounts.map(a=>`<option value="${a.id}" ${d&&d.account===a.id?"selected":""}>${a.name}</option>`).join("")}</select></div>
-    <div class="field"><label>Contact</label><select id="f_contact"><option value="">— None —</option>${DB.contacts.map(ct=>`<option value="${ct.id}" ${d&&d.contact===ct.id?"selected":""}>${ct.first} ${ct.last}</option>`).join("")}</select></div>
+    <div class="field full"><label>Deal name</label><input id="f_name" value="${esc(d?d.name:'')}"></div>
+    <div class="field"><label>Account</label><select id="f_account"><option value="">— None —</option>${DB.accounts.map(a=>`<option value="${a.id}" ${d&&d.account===a.id?"selected":""}>${esc(a.name)}</option>`).join("")}</select></div>
+    <div class="field"><label>Contact</label><select id="f_contact"><option value="">— None —</option>${DB.contacts.map(ct=>`<option value="${ct.id}" ${d&&d.contact===ct.id?"selected":""}>${esc(ct.first)} ${esc(ct.last)}</option>`).join("")}</select></div>
     <div class="field"><label>Amount (KSh)</label><input id="f_amount" type="number" value="${d?d.amount:0}"></div>
     <div class="field"><label>Probability (%)</label><input id="f_prob" type="number" min="0" max="100" value="${d?d.probability:20}"></div>
     <div class="field"><label>Stage</label><select id="f_stage">${PIPELINE_STAGES.map(s=>`<option ${d&&d.stage===s?"selected":""}>${s}</option>`).join("")}</select></div>
     <div class="field"><label>Closing date</label><input id="f_closing" type="date" value="${d?d.closing:''}"></div>
     <div class="field"><label>Deal type</label><select id="f_type">${["New Business","Upsell","Renewal"].map(s=>`<option ${d&&d.type===s?"selected":""}>${s}</option>`).join("")}</select></div>
-    <div class="field"><label>Owner</label><input id="f_owner" value="${d?d.owner:CURRENT_USER.name}"></div>
-    <div class="field full"><label>Next step</label><input id="f_next" value="${d?d.nextStep:''}"></div>
-    <div class="field full"><label>Description</label><textarea id="f_desc">${d?d.description:''}</textarea></div>
+    <div class="field"><label>Owner</label>${ownerSelect("f_owner", d?d.owner:CURRENT_USER.name)}</div>
+    <div class="field full"><label>Next step</label><input id="f_next" value="${esc(d?d.nextStep:'')}"></div>
+    <div class="field full"><label>Description</label><textarea id="f_desc">${esc(d?d.description:'')}</textarea></div>
   </div>`;
   openModal(d?"Edit Deal":"New Deal", body, ()=>{
     const data = {name:val('f_name'), account:val('f_account'), contact:val('f_contact'), amount:Number(val('f_amount')||0), probability:Number(val('f_prob')||0), stage:val('f_stage'), closing:val('f_closing'), type:val('f_type'), owner:val('f_owner'), nextStep:val('f_next'), description:val('f_desc'), source:d?d.source:"Manual Entry", competitor:d?d.competitor:""};
     if(!data.name){ toast("Deal name is required."); return false; }
-    if(d){ Object.assign(d,data); notify(`Deal updated: ${data.name}`); }
-    else { data.id=uid("deal"); data.created=todayISO(); DB.deals.push(data); notify(`New deal created: ${data.name}`); }
+    if(!canManage('deals')){ toast("You do not have permission to change deals."); return false; }
+    if(d){
+      const newStage = data.stage, newProb = data.probability;
+      delete data.stage;
+      Object.assign(d,data);
+      if(!applyStageChange(d, newStage)) d.probability = newProb;
+      notify(`Deal updated: ${data.name}`);
+    }
+    else { data.id=uid("deal"); data.created=todayISO(); data.stageChangedAt=todayISO(); if(data.stage==="Closed Won"||data.stage==="Closed Lost") data.closedAt=todayISO(); DB.deals.push(data); notify(`New deal created: ${data.name}`); }
     save();
     goTo("deal-detail", {type:'deal', id:d?d.id:data.id});
     return true;
@@ -842,7 +904,7 @@ function renderPipeline(c){
   const stages = PIPELINE_STAGES;
   c.innerHTML = `
     <div class="pageheader">
-      <div><h1>Pipeline</h1><div class="sub">Drag a deal to move it between stages.</div></div>
+      <div><h1>Pipeline</h1><div class="sub">Drag a deal to move it, or use “Move to…” on a card (works on phones and with a keyboard).</div></div>
       <div class="actions"><button class="btn btn-primary" onclick="openDealForm()">+ New Deal</button></div>
     </div>
     <div class="kanban">
@@ -853,10 +915,11 @@ function renderPipeline(c){
           <div class="kanban-col-head"><span>${st}</span><span style="color:var(--ink-soft);font-weight:400;">${items.length}</span></div>
           <div class="kanban-col-body">
             ${items.map(d=>`
-              <div class="kcard" draggable="true" ondragstart="dragDealId='${d.id}';this.classList.add('dragging')" ondragend="this.classList.remove('dragging')" onclick="goTo('deal-detail',{type:'deal',id:'${d.id}'})">
-                <div class="kname">${d.name}</div>
+              <div class="kcard" draggable="${canManage('deals')?'true':'false'}" tabindex="0" role="button" aria-label="Open deal ${esc(d.name)}" ondragstart="dragDealId='${d.id}';this.classList.add('dragging')" ondragend="this.classList.remove('dragging')" onclick="goTo('deal-detail',{type:'deal',id:'${d.id}'})">
+                <div class="kname">${esc(d.name)}</div>
                 <div class="kamount">${fmtMoney(d.amount)}</div>
-                <div class="kmeta">${findAccount(d.account)?findAccount(d.account).name:"No account"} · ${d.probability}%</div>
+                <div class="kmeta">${esc(findAccount(d.account)?findAccount(d.account).name:"No account")} · ${d.probability}%</div>
+                ${canManage('deals') ? `<select class="kmove" aria-label="Move ${esc(d.name)} to stage" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()" onchange="updateDealStage('${d.id}',this.value)"><option value="">Move to…</option>${stages.filter(x=>x!==d.stage).map(x=>`<option value="${x}">${x}</option>`).join("")}</select>` : ``}
               </div>
             `).join("")}
             <div style="font-size:11px;color:var(--ink-soft);padding:6px 4px 0 4px;">Total: ${fmtMoney(total)}</div>
@@ -869,6 +932,7 @@ function renderPipeline(c){
 function onDropStage(e, stage){
   e.currentTarget.classList.remove('dragover');
   if(!dragDealId) return;
+  if(!canManage('deals')){ toast("You do not have permission to move deals."); dragDealId=null; return; }
   updateDealStage(dragDealId, stage);
   dragDealId = null;
 }
@@ -879,7 +943,7 @@ function renderForecast(c){
   const total = open.reduce((s,d)=>s+Number(d.amount)*d.probability/100,0);
   c.innerHTML = `
     <div class="pageheader"><div><h1>Forecast</h1><div class="sub">Expected revenue = deal amount × probability, summed across open deals.</div></div></div>
-    <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi-row kpi-3">
       ${kpi("Open Deals", open.length)}
       ${kpi("Total Pipeline", fmtMoney(open.reduce((s,d)=>s+Number(d.amount),0)))}
       ${kpi("Forecast (Expected Revenue)", fmtMoney(Math.round(total)))}
@@ -888,7 +952,7 @@ function renderForecast(c){
       <thead><tr><th>Deal</th><th>Amount</th><th>Probability</th><th>Expected</th><th>Closing</th></tr></thead>
       <tbody>
       ${open.map(d=>`<tr onclick="goTo('deal-detail',{type:'deal',id:'${d.id}'})">
-        <td><span class="rowlink">${d.name}</span></td><td>${fmtMoney(d.amount)}</td><td>${d.probability}%</td>
+        <td><span class="rowlink">${esc(d.name)}</span></td><td>${fmtMoney(d.amount)}</td><td>${d.probability}%</td>
         <td>${fmtMoney(Math.round(d.amount*d.probability/100))}</td><td>${d.closing?fmtDate(d.closing):"—"}</td>
       </tr>`).join("")}
       <tr style="font-weight:700;background:var(--paper-2);"><td colspan="3">Total forecast</td><td>${fmtMoney(Math.round(total))}</td><td></td></tr>
@@ -911,15 +975,18 @@ function renderActivities(kind, c){
         const overdue = !a.done && a.due < todayISO();
         return `<div class="checklist-item ${a.done?'done':''}">
           <input type="checkbox" ${a.done?'checked':''} onchange="toggleActivity('${a.id}')" ${canManage('activities')?'':'disabled'}>
-          <div class="cltext">${a.title} <span style="color:var(--ink-soft);font-size:11.5px;">(${a.owner})</span></div>
-          <span class="cltag ${overdue?'overdue':''}">${overdue?'Overdue · ':''}${fmtDate(a.due)}</span>
+          <div class="cltext">${esc(a.title)} <span style="color:var(--ink-soft);font-size:11.5px;">(${esc(a.owner)})</span>${activityMeta(a)}</div>
+          <span class="cltag ${overdue?'overdue':''}">${overdue?'Overdue · ':''}${fmtDate(a.due)}${a.time?' '+esc(a.time):''}</span>
+          ${canManage('activities') ? `<button class="xbtn" title="Edit" onclick="openActivityForm('${a.kind}',{id:'${a.id}'})">✎</button><button class="xbtn" title="Delete" onclick="deleteRecord('activity','${a.id}')">✕</button>` : ``}
         </div>`;
       }).join("") : `<div class="empty">No ${kind.toLowerCase()}s yet.</div>`}
     </div>
   `;
 }
 function toggleActivity(id){
+  if(!canManage('activities')){ toast("You do not have permission to change activities."); renderView(); return; }
   const a = DB.activities.find(x=>x.id===id);
+  if(!a) return;
   a.done = !a.done;
   save(); renderView();
 }
@@ -927,7 +994,7 @@ function openActivityForm(kind){
   const body = `<div class="formgrid">
     <div class="field full"><label>Title</label><input id="f_title"></div>
     <div class="field"><label>Due date</label><input id="f_due" type="date" value="${todayISO()}"></div>
-    <div class="field"><label>Owner</label><input id="f_owner" value="${CURRENT_USER.name}"></div>
+    <div class="field"><label>Owner</label>${ownerSelect("f_owner", CURRENT_USER.name)}</div>
   </div>`;
   openModal(`New ${kind}`, body, ()=>{
     const title = val('f_title');
@@ -943,8 +1010,8 @@ function renderRelatedActivities(relatedId){
   return listOrEmpty(items.map(a=>`
     <div class="checklist-item ${a.done?'done':''}">
       <input type="checkbox" ${a.done?'checked':''} onchange="toggleActivity('${a.id}')">
-      <div class="cltext">${a.title}</div>
-      <span class="cltag ${(!a.done && a.due<todayISO())?'overdue':''}">${fmtDate(a.due)}</span>
+      <div class="cltext"><b style="font-size:11px;color:var(--ink-soft);">${esc(a.kind)}</b> ${esc(a.title)}${activityMeta(a)}</div>
+      <span class="cltag ${(!a.done && a.due<todayISO())?'overdue':''}">${fmtDate(a.due)}${a.time?' '+esc(a.time):''}</span>
     </div>
   `), "No linked activities yet.");
 }
@@ -962,7 +1029,7 @@ function renderCalendar(c){
   for(let d=1; d<=daysInMonth; d++){
     const iso = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const items = DB.activities.filter(a=>a.due===iso);
-    cells += `<div class="cal-cell"><div class="cal-daynum">${d}</div>${items.map(a=>`<div class="cal-item ${a.done?'done':''}" title="${a.title}">${a.title}</div>`).join("")}</div>`;
+    cells += `<div class="cal-cell"><div class="cal-daynum">${d}</div>${items.map(a=>`<div class="cal-item ${a.done?'done':''}" title="${esc(a.title)}">${esc(a.title)}</div>`).join("")}</div>`;
   }
   c.innerHTML = `
     <div class="pageheader">
@@ -993,7 +1060,7 @@ function renderReports(c){
   const maxStage = Math.max(...Object.values(dealsByStage),1);
   c.innerHTML = `
     <div class="pageheader"><div><h1>Reports</h1><div class="sub">Lead, deal and activity performance at a glance.</div></div></div>
-    <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi-row kpi-4">
       ${kpi("Win Rate", winRate+"%")}
       ${kpi("Average Deal Size", fmtMoney(avgDeal))}
       ${kpi("Deals Won", won.length)}
@@ -1010,8 +1077,8 @@ function renderReports(c){
     <div class="panel"><h3>Activity summary</h3>
       <div class="fieldsgrid">
         <div><div class="k">Tasks completed</div><div class="v">${DB.activities.filter(a=>a.kind==='Task'&&a.done).length}</div></div>
-        <div><div class="k">Calls logged</div><div class="v">${DB.activities.filter(a=>a.kind==='Call').length}</div></div>
-        <div><div class="k">Meetings held</div><div class="v">${DB.activities.filter(a=>a.kind==='Meeting').length}</div></div>
+        <div><div class="k">Calls logged</div><div class="v">${DB.activities.filter(a=>a.kind==='Call'&&a.done).length}</div></div>
+        <div><div class="k">Meetings held</div><div class="v">${DB.activities.filter(a=>a.kind==='Meeting'&&a.done).length}</div></div>
         <div><div class="k">Overdue activities</div><div class="v">${DB.activities.filter(a=>!a.done && a.due<todayISO()).length}</div></div>
       </div>
     </div>
@@ -1046,11 +1113,23 @@ function renderSettings(c){
   `;
 }
 function resetDemoData(){
-  if(!confirm("This permanently deletes all leads, accounts, contacts, deals and activities for this company. Continue?")) return;
+  if(!isAdmin()){ toast("Only an Administrator can clear company data."); return; }
+  const company = (CURRENT_USER && CURRENT_USER.company) || "";
+  const typed = prompt('This permanently deletes ALL records for this company.\nA backup file will be downloaded first.\n\nType the company name ("'+company+'") to confirm:');
+  if(typed===null) return;
+  if(typed.trim()!==company.trim()){ toast("Company name did not match. Nothing was deleted."); return; }
+  try{
+    const blob = new Blob([JSON.stringify(DB,null,2)],{type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url; link.download = "acacia-crm-backup-before-clear-"+todayISO()+".json";
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+  }catch(e){}
   DB = seedData();
   save();
   goTo("dashboard");
-  toast("All data cleared.");
+  toast("All data cleared. A backup was downloaded.");
 }
 
 /* =========================================================
@@ -1101,7 +1180,7 @@ function renderNotifBadge(){
 }
 function renderNotifPanel(){
   const panel = document.getElementById("notifPanel");
-  panel.innerHTML = DB.notifications.length ? DB.notifications.slice(0,12).map(n=>`<div class="notif-item">${n.text}<div class="t">${n.time}</div></div>`).join("") : `<div class="notif-item">No notifications.</div>`;
+  panel.innerHTML = DB.notifications.length ? DB.notifications.slice(0,12).map(n=>`<div class="notif-item">${esc(n.text)}<div class="t">${n.time}</div></div>`).join("") : `<div class="notif-item">No notifications.</div>`;
 }
 
 /* ---------- Global search ---------- */
@@ -1135,8 +1214,7 @@ function initApp(){
     const p = document.getElementById("notifPanel");
     p.classList.toggle("open");
     document.getElementById("userMenuPanel").classList.remove("open");
-    DB.notifications.forEach(n=>n.read=true);
-    save(); renderNotifBadge();
+    markNotifsRead();
   };
   document.addEventListener("click", (e)=>{
     const p = document.getElementById("notifPanel");

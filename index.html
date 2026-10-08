@@ -469,6 +469,7 @@
         <h2>Welcome back</h2>
         <div class="sub">Log in to your Acacia Books CRM.</div>
         <div class="auth-error" id="loginError"></div>
+        <div class="auth-field"><label>Company name</label><input id="loginCompany" type="text" autocomplete="organization" placeholder="Exactly as registered (or company ID)"></div>
         <div class="auth-field"><label>Email address</label><input id="loginEmail" type="email" autocomplete="username" placeholder="you@company.co.ke"></div>
         <div class="auth-field"><label>Password</label><input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••"></div>
         <button class="btn btn-primary auth-submit" onclick="handleLogin()">Log In</button>
@@ -536,8 +537,6 @@
 
 <div class="toast-wrap" id="toastWrap"></div>
 
-<script src="script.js"></script>
-
 <div class="palette-back" id="paletteBack">
   <div class="palette">
     <input id="paletteInput" placeholder="Search records or jump to a page…" autocomplete="off">
@@ -546,7 +545,7 @@
   </div>
 </div>
 
-<script src="script-v2.js"></script>
+<script src="script.js"></script>
 
 </body>
 </html>

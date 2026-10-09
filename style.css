@@ -469,7 +469,7 @@
   .auth-form-panel .sub{color:var(--ink-soft);font-size:12.5px;margin-bottom:20px;}
   .auth-field{margin-bottom:13px;}
   .auth-field label{display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:4px;font-weight:600;}
-  .auth-field input{
+  .auth-field input,.auth-field select{
     width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius);
     background:var(--paper);color:var(--ink);
   }

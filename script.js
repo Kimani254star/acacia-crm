@@ -902,7 +902,7 @@ function openLeadForm(id){
       <div class="field"><label>Email</label><input id="f_email" value="${l?l.email:''}"></div>
       <div class="field"><label>Phone</label><input id="f_phone" value="${l?l.phone:''}"></div>
       <div class="field"><label>County</label><input id="f_county" value="${l?l.county:''}"></div>
-      <div class="field"><label>Lead source</label><select id="f_source">${["Website","Google","Facebook","LinkedIn","Referral","Phone","Email","Exhibition","Advertisement","Existing Customer","Manual Entry"].map(s=>`<option ${l&&l.source===s?"selected":""}>${s}</option>`).join("")}</select></div>
+      <div class="field"><label>Lead source</label><select id="f_source" onchange="crmAddNew(this,'leadSources','lead source')">${crmCustList("leadSources",["Website","Google","Facebook","LinkedIn","Referral","Phone","Email","Exhibition","Advertisement","Existing Customer","Manual Entry"]).map(s=>`<option ${l&&l.source===s?"selected":""}>${s}</option>`).join("")}<option value="__add_new__">➕ Add New...</option></select></div>
       <div class="field"><label>Status</label><select id="f_status">${["New","Contacted","Attempted Contact","Qualified","Unqualified","Nurturing","Converted","Lost"].map(s=>`<option ${l&&l.status===s?"selected":""}>${s}</option>`).join("")}</select></div>
       <div class="field"><label>Lead score (0–100)</label><input id="f_score" type="number" min="0" max="100" value="${l?l.score:20}"></div>
       <div class="field"><label>Expected revenue (KSh)</label><input id="f_revenue" type="number" value="${l?l.revenue:0}"></div>
@@ -1079,7 +1079,7 @@ function openAccountForm(id){
     <div class="field"><label>Employees</label><input id="f_employees" value="${a?a.employees:''}"></div>
     <div class="field"><label>Annual revenue (KSh)</label><input id="f_revenue" type="number" value="${a?a.revenue:0}"></div>
     <div class="field"><label>Owner</label><input id="f_owner" value="${a?a.owner:CURRENT_USER.name}"></div>
-    <div class="field"><label>Account type</label><select id="f_type">${["Prospect","Customer","Partner"].map(s=>`<option ${a&&a.type===s?"selected":""}>${s}</option>`).join("")}</select></div>
+    <div class="field"><label>Account type</label><select id="f_type" onchange="crmAddNew(this,'accountTypes','account type')">${crmCustList("accountTypes",["Prospect","Customer","Partner"]).map(s=>`<option ${a&&a.type===s?"selected":""}>${s}</option>`).join("")}<option value="__add_new__">➕ Add New...</option></select></div>
   </div>`;
   openModal(a?"Edit Account":"New Account", body, ()=>{
     const data = {name:val('f_name'), industry:val('f_industry'), website:val('f_website'), phone:val('f_phone'), email:val('f_email'), address:val('f_address'), country:"Kenya", employees:val('f_employees'), revenue:Number(val('f_revenue')||0), owner:val('f_owner'), type:val('f_type'), status:"Active"};
@@ -1228,7 +1228,7 @@ function openDealForm(id){
     <div class="field"><label>Probability (%)</label><input id="f_prob" type="number" min="0" max="100" value="${d?d.probability:20}"></div>
     <div class="field"><label>Stage</label><select id="f_stage">${PIPELINE_STAGES.map(s=>`<option ${d&&d.stage===s?"selected":""}>${s}</option>`).join("")}</select></div>
     <div class="field"><label>Closing date</label><input id="f_closing" type="date" value="${d?d.closing:''}"></div>
-    <div class="field"><label>Deal type</label><select id="f_type">${["New Business","Upsell","Renewal"].map(s=>`<option ${d&&d.type===s?"selected":""}>${s}</option>`).join("")}</select></div>
+    <div class="field"><label>Deal type</label><select id="f_type" onchange="crmAddNew(this,'dealTypes','deal type')">${crmCustList("dealTypes",["New Business","Upsell","Renewal"]).map(s=>`<option ${d&&d.type===s?"selected":""}>${s}</option>`).join("")}<option value="__add_new__">➕ Add New...</option></select></div>
     <div class="field"><label>Owner</label><input id="f_owner" value="${d?d.owner:CURRENT_USER.name}"></div>
     <div class="field full"><label>Next step</label><input id="f_next" value="${d?d.nextStep:''}"></div>
     <div class="field full"><label>Description</label><textarea id="f_desc">${d?d.description:''}</textarea></div>
@@ -2525,3 +2525,37 @@ function removeUser(email){
     if(window.AcaciaAppearance) window.AcaciaAppearance.mount();
   };
 })();
+
+
+/* =========================================================
+   CUSTOM DROPDOWN OPTIONS ("➕ Add New..." like Acacia Books)
+   Pick "Add New...", type a value, it is saved and added to the list.
+   ========================================================= */
+function crmCustKey(key){
+  const cid = (typeof CURRENT_USER!=="undefined" && CURRENT_USER && CURRENT_USER.companyId) || "";
+  return "crmCustom:" + cid + ":" + key;
+}
+function crmCustGet(key){
+  try{ const v = JSON.parse(localStorage.getItem(crmCustKey(key))||"[]"); return Array.isArray(v)?v:[]; }catch(e){ return []; }
+}
+function crmCustList(key, defaults){
+  const out = defaults.slice();
+  crmCustGet(key).forEach(v=>{ if(!out.some(d=>String(d).toLowerCase()===String(v).toLowerCase())) out.push(v); });
+  return out;
+}
+function crmAddNew(sel, key, label){
+  if(!sel || sel.value!=="__add_new__") return;
+  const raw = (window.prompt("Enter new "+label+":","")||"").trim();
+  if(!raw){ sel.selectedIndex = 0; return; }
+  const opts = Array.from(sel.options).filter(o=>o.value!=="__add_new__");
+  let existing = opts.find(o=>o.value.toLowerCase()===raw.toLowerCase());
+  if(!existing){
+    const list = crmCustGet(key);
+    list.push(raw);
+    try{ localStorage.setItem(crmCustKey(key), JSON.stringify(list)); }catch(e){}
+    existing = document.createElement("option");
+    existing.value = raw; existing.textContent = raw;
+    sel.insertBefore(existing, sel.querySelector('option[value="__add_new__"]'));
+  }
+  sel.value = existing.value;
+}

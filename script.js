@@ -867,7 +867,7 @@ function renderLeads(c){
             <td><span class="pill score-${scoreLabel(l.score)}">${l.score} · ${scoreLabelText(l.score)}</span></td>
             <td>${l.owner}</td>
             <td>${l.nextFollowup?fmtDate(l.nextFollowup):"—"}</td>
-            <td onclick="event.stopPropagation()">${canManage('leads') ? `<button class="btn btn-sm" onclick="openLeadForm('${l.id}')">Edit</button>` : ``}</td>
+            <td class="acx-cell" onclick="event.stopPropagation()">${crmAct('leads',{view:`goTo('lead-detail',{type:'lead',id:'${l.id}'})`, edit:`openLeadForm('${l.id}')`, clone:`cloneLead('${l.id}')`, del:`deleteLead('${l.id}')`})}</td>
           </tr>
         `).join("") : `<tr><td colspan="8"><div class="empty">No leads match this filter.</div></td></tr>`}
         </tbody>
@@ -1018,7 +1018,7 @@ function renderAccounts(c){
     </div>
     <div class="tablewrap">
       <table>
-        <thead><tr><th>Account</th><th>Industry</th><th>Owner</th><th>Type</th><th>Contacts</th><th>Open Deals</th><th>Status</th></tr></thead>
+        <thead><tr><th>Account</th><th>Industry</th><th>Owner</th><th>Type</th><th>Contacts</th><th>Open Deals</th><th>Status</th><th class="acx-cell"></th></tr></thead>
         <tbody>
         ${rows.map(a=>`
           <tr onclick="goTo('account-detail',{type:'account',id:'${a.id}'})">
@@ -1029,6 +1029,7 @@ function renderAccounts(c){
             <td>${accountContacts(a.id).length}</td>
             <td>${accountDeals(a.id).filter(d=>!d.stage.startsWith("Closed")).length}</td>
             <td><span class="pill status-Qualified">${a.status}</span></td>
+            <td class="acx-cell">${crmAct('accounts',{view:`goTo('account-detail',{type:'account',id:'${a.id}'})`, edit:`openAccountForm('${a.id}')`, clone:`cloneAccount('${a.id}')`, del:`deleteAccount('${a.id}')`})}</td>
           </tr>
         `).join("")}
         </tbody>
@@ -1120,7 +1121,7 @@ function renderContacts(c){
       <div class="actions">${canManage('contacts') ? `<button class="btn btn-primary" onclick="openContactForm()">+ New Contact</button>` : ``}</div>
     </div>
     <div class="tablewrap"><table>
-      <thead><tr><th>Name</th><th>Title</th><th>Account</th><th>Email</th><th>Phone</th><th>Owner</th></tr></thead>
+      <thead><tr><th>Name</th><th>Title</th><th>Account</th><th>Email</th><th>Phone</th><th>Owner</th><th class="acx-cell"></th></tr></thead>
       <tbody>
       ${rows.map(ct=>{
         const acc = findAccount(ct.account);
@@ -1131,27 +1132,32 @@ function renderContacts(c){
           <td>${ct.email||"—"}</td>
           <td>${ct.phone||"—"}</td>
           <td>${ct.owner||"—"}</td>
+          <td class="acx-cell">${crmAct('contacts',{view:`previewContact('${ct.id}')`, edit:`openContactForm('${ct.id}')`, clone:`cloneContact('${ct.id}')`, del:`deleteContact('${ct.id}')`})}</td>
         </tr>`;
       }).join("")}
       </tbody>
     </table></div>
   `;
 }
-function openContactForm(){
+function openContactForm(id){
+  const ct = id ? DB.contacts.find(x=>x.id===id) : null;
+  const v = (k,d)=> ct ? (ct[k]||"") : (d||"");
   const body = `<div class="formgrid">
-    <div class="field"><label>First name</label><input id="f_first"></div>
-    <div class="field"><label>Last name</label><input id="f_last"></div>
-    <div class="field"><label>Title</label><input id="f_title"></div>
-    <div class="field"><label>Account</label><select id="f_account"><option value="">— None —</option>${DB.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join("")}</select></div>
-    <div class="field"><label>Email</label><input id="f_email"></div>
-    <div class="field"><label>Phone</label><input id="f_phone"></div>
-    <div class="field"><label>Department</label><input id="f_department"></div>
-    <div class="field"><label>Owner</label><input id="f_owner" value="${CURRENT_USER.name}"></div>
+    <div class="field"><label>First name</label><input id="f_first" value="${v('first')}"></div>
+    <div class="field"><label>Last name</label><input id="f_last" value="${v('last')}"></div>
+    <div class="field"><label>Title</label><input id="f_title" value="${v('title')}"></div>
+    <div class="field"><label>Account</label><select id="f_account"><option value="">— None —</option>${DB.accounts.map(a=>`<option value="${a.id}" ${ct&&ct.account===a.id?"selected":""}>${a.name}</option>`).join("")}</select></div>
+    <div class="field"><label>Email</label><input id="f_email" value="${v('email')}"></div>
+    <div class="field"><label>Phone</label><input id="f_phone" value="${v('phone')}"></div>
+    <div class="field"><label>Department</label><input id="f_department" value="${v('department')}"></div>
+    <div class="field"><label>Owner</label><input id="f_owner" value="${ct?(ct.owner||""):CURRENT_USER.name}"></div>
   </div>`;
-  openModal("New Contact", body, ()=>{
+  openModal(ct?"Edit Contact":"New Contact", body, ()=>{
     const first = val('f_first');
     if(!first){ toast("First name is required."); return false; }
-    DB.contacts.push({id:uid("con"), first, last:val('f_last'), title:val('f_title'), account:val('f_account'), email:val('f_email'), phone:val('f_phone'), mobile:val('f_phone'), department:val('f_department'), owner:val('f_owner'), source:"Manual Entry"});
+    const data = {first, last:val('f_last'), title:val('f_title'), account:val('f_account'), email:val('f_email'), phone:val('f_phone'), mobile:val('f_phone'), department:val('f_department'), owner:val('f_owner')};
+    if(ct){ Object.assign(ct, data); save(); notify(`Contact updated: ${first} ${data.last}`); renderView(); return true; }
+    DB.contacts.push({id:uid("con"), ...data, source:"Manual Entry"});
     save(); notify(`New contact created: ${first} ${val('f_last')}`);
     goTo("contacts");
     return true;
@@ -1284,6 +1290,7 @@ function renderPipeline(c){
                 <div class="kname">${d.name}</div>
                 <div class="kamount">${fmtMoney(d.amount)}</div>
                 <div class="kmeta">${findAccount(d.account)?findAccount(d.account).name:"No account"} · ${d.probability}%</div>
+                <div style="margin-top:4px;margin-left:-6px">${crmAct('deals',{view:`goTo('deal-detail',{type:'deal',id:'${d.id}'})`, edit:`openDealForm('${d.id}')`, clone:`cloneDeal('${d.id}')`, del:`deleteDeal('${d.id}')`})}</div>
               </div>
             `).join("")}
             <div style="font-size:11px;color:var(--ink-soft);padding:6px 4px 0 4px;">Total: ${fmtMoney(total)}</div>
@@ -1340,6 +1347,7 @@ function renderActivities(kind, c){
           <input type="checkbox" ${a.done?'checked':''} onchange="toggleActivity('${a.id}')" ${canManage('activities')?'':'disabled'}>
           <div class="cltext">${a.title} <span style="color:var(--ink-soft);font-size:11.5px;">(${a.owner})</span></div>
           <span class="cltag ${overdue?'overdue':''}">${overdue?'Overdue · ':''}${fmtDate(a.due)}</span>
+          ${crmAct('activities',{edit:`openActivityForm('${kind}','${a.id}')`, clone:`cloneActivity('${a.id}')`, del:`deleteActivity('${a.id}')`})}
         </div>`;
       }).join("") : `<div class="empty">No ${kind.toLowerCase()}s yet.</div>`}
     </div>
@@ -1350,15 +1358,98 @@ function toggleActivity(id){
   a.done = !a.done;
   save(); renderView();
 }
-function openActivityForm(kind){
+
+/* =====================================================================
+   ROW ACTIONS — preview / edit / clone / delete (same buttons as Books)
+   Edit, clone and delete only show for roles that can manage that record type.
+===================================================================== */
+function crmAct(type, spec){
+  if(!canManage(type)){ spec = {view:spec.view}; }
+  return ACX_ACT(spec);
+}
+function dropRelated(id){
+  DB.activities = DB.activities.filter(a=>a.related!==id);
+  DB.timeline = DB.timeline.filter(t=>t.entity!==id);
+}
+function cloneLead(id){
+  const l = findLead(id); if(!l) return;
+  DB.leads.push({...l, id:uid("lead"), name:l.name+" (Copy)", status:"New", created:todayISO(), lastContacted:""});
+  save(); notify(`Lead cloned: ${l.name}`); renderView();
+}
+function deleteLead(id){
+  const l = findLead(id); if(!l) return;
+  if(!confirm(`Delete lead "${l.name}" and its linked activities? This cannot be undone.`)) return;
+  DB.leads = DB.leads.filter(x=>x.id!==id); dropRelated(id);
+  save(); notify(`Lead deleted: ${l.name}`); renderView();
+}
+function cloneAccount(id){
+  const a = findAccount(id); if(!a) return;
+  DB.accounts.push({...a, id:uid("acc"), name:a.name+" (Copy)", created:todayISO()});
+  save(); notify(`Account cloned: ${a.name}`); renderView();
+}
+function deleteAccount(id){
+  const a = findAccount(id); if(!a) return;
+  const nc = accountContacts(id).length, nd = accountDeals(id).length;
+  if(nc || nd){ toast(`Cannot delete ${a.name}: it still has ${nc} contact${nc===1?"":"s"} and ${nd} deal${nd===1?"":"s"}.`); return; }
+  if(!confirm(`Delete account "${a.name}"? This cannot be undone.`)) return;
+  DB.accounts = DB.accounts.filter(x=>x.id!==id); dropRelated(id);
+  save(); notify(`Account deleted: ${a.name}`); renderView();
+}
+function previewContact(id){
+  const ct = DB.contacts.find(x=>x.id===id); if(!ct) return;
+  const acc = findAccount(ct.account);
+  const cell = (k,v)=>`<div class="field"><label>${k}</label><div>${v||"—"}</div></div>`;
+  openModal(`${ct.first} ${ct.last||""}`, `<div class="formgrid">
+    ${cell("Title",ct.title)}${cell("Account",acc?acc.name:"")}${cell("Email",ct.email)}${cell("Phone",ct.phone)}${cell("Department",ct.department)}${cell("Owner",ct.owner)}${cell("Source",ct.source)}
+  </div>`, ()=>true);
+  const sb = document.getElementById("modalSaveBtn"); if(sb) sb.style.display = "none";
+}
+function cloneContact(id){
+  const ct = DB.contacts.find(x=>x.id===id); if(!ct) return;
+  DB.contacts.push({...ct, id:uid("con"), first:ct.first+" (Copy)"});
+  save(); notify(`Contact cloned: ${ct.first} ${ct.last||""}`); renderView();
+}
+function deleteContact(id){
+  const ct = DB.contacts.find(x=>x.id===id); if(!ct) return;
+  if(!confirm(`Delete contact "${ct.first} ${ct.last||""}"? This cannot be undone.`)) return;
+  DB.contacts = DB.contacts.filter(x=>x.id!==id);
+  DB.deals.forEach(d=>{ if(d.contact===id) d.contact=""; });
+  dropRelated(id);
+  save(); notify(`Contact deleted: ${ct.first} ${ct.last||""}`); renderView();
+}
+function cloneDeal(id){
+  const d = findDeal(id); if(!d) return;
+  DB.deals.push({...d, id:uid("deal"), name:d.name+" (Copy)", created:todayISO()});
+  save(); notify(`Deal cloned: ${d.name}`); renderView();
+}
+function deleteDeal(id){
+  const d = findDeal(id); if(!d) return;
+  if(!confirm(`Delete deal "${d.name}" and its linked activities? This cannot be undone.`)) return;
+  DB.deals = DB.deals.filter(x=>x.id!==id); dropRelated(id);
+  save(); notify(`Deal deleted: ${d.name}`); renderView();
+}
+function cloneActivity(id){
+  const a = DB.activities.find(x=>x.id===id); if(!a) return;
+  DB.activities.push({...a, id:uid("act"), title:a.title+" (Copy)", done:false});
+  save(); renderView();
+}
+function deleteActivity(id){
+  const a = DB.activities.find(x=>x.id===id); if(!a) return;
+  if(!confirm(`Delete "${a.title}"? This cannot be undone.`)) return;
+  DB.activities = DB.activities.filter(x=>x.id!==id);
+  save(); renderView();
+}
+function openActivityForm(kind, id){
+  const ac = id ? DB.activities.find(x=>x.id===id) : null;
   const body = `<div class="formgrid">
-    <div class="field full"><label>Title</label><input id="f_title"></div>
-    <div class="field"><label>Due date</label><input id="f_due" type="date" value="${todayISO()}"></div>
-    <div class="field"><label>Owner</label><input id="f_owner" value="${CURRENT_USER.name}"></div>
+    <div class="field full"><label>Title</label><input id="f_title" value="${ac?String(ac.title).replace(/"/g,'&quot;'):''}"></div>
+    <div class="field"><label>Due date</label><input id="f_due" type="date" value="${ac?ac.due:todayISO()}"></div>
+    <div class="field"><label>Owner</label><input id="f_owner" value="${ac?(ac.owner||""):CURRENT_USER.name}"></div>
   </div>`;
-  openModal(`New ${kind}`, body, ()=>{
+  openModal(ac?`Edit ${kind}`:`New ${kind}`, body, ()=>{
     const title = val('f_title');
     if(!title){ toast("Please enter a title."); return false; }
+    if(ac){ Object.assign(ac,{title, due:val('f_due'), owner:val('f_owner')}); save(); notify(`${kind} updated: ${title}`); renderView(); return true; }
     DB.activities.push({id:uid("act"), kind, title, related:"", relatedType:"", due:val('f_due'), owner:val('f_owner'), done:false});
     save(); notify(`New ${kind.toLowerCase()} created: ${title}`);
     renderView();

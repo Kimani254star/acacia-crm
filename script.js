@@ -140,6 +140,29 @@ function hpContact(e){
 
   async function signIn(email, pass, company) {
     email = low(email);
+    /* passwords are checked inside Postgres (acx_login); the browser never sees a hash */
+    var rows;
+    try { rows = await rpc('acx_login', { p_email: email, p_password: pass, p_company: company || null }); }
+    catch (e) { if (e.code === 'missing') return signInLegacy(email, pass, company); throw e; }   /* acx_login not installed yet: remove this line once step2_secure_login.sql is run */
+    if (!Array.isArray(rows) || !rows.length) return null;
+    return finishSignIn(rows, email);
+  }
+
+  async function finishSignIn(ok, email) {
+    var row = ok[0];
+    if (ok.length > 1) {
+      var pick = w.prompt('This login belongs to more than one company:\n' + ok.map(function (x, n) { return (n + 1) + '. ' + ((x.data && x.data.companyName) || x.company_id) + ' (' + x.company_id + ')'; }).join('\n') + '\n\nType the number to open:', '1');
+      row = ok[(parseInt(pick, 10) || 1) - 1] || ok[0];
+    }
+    var msg = await gate(row.company_id, email); if (msg) throw err('blocked', msg);
+    try { if (row.session && w.AcxSession) w.AcxSession.add(row.session); } catch (e) {}   /* session token for row-level security */
+    var d = row.data || {};
+    return { companyId: row.company_id, company: d.companyName || '', name: d.fullName || d.username || email.split('@')[0], email: email, role: mapRole(d.role, d) };
+  }
+
+  /* OLD path (reads the hash into the browser). Only used until acx_login exists. */
+  async function signInLegacy(email, pass, company) {
+    email = low(email);
     var r = await req('app_accounts?select=login_id,username,company_id,data&login_id=eq.' + enc(email));
     if (!r.ok) throw err('offline', 'Could not read accounts (' + r.status + '). Run acacia_apps_cloud.sql in Supabase.');
     var rows = await r.json(), ok = [], cn = low(company);
@@ -157,7 +180,7 @@ function hpContact(e){
   }
 
   async function register(o) {
-    var salt = newSalt(), h = await hash(o.password, salt);
+    var salt = o.passwordSalt || newSalt(), h = o.passwordHash || await hash(o.password, salt);
     var id = await rpc('acx_register_company', { p_company: o.company, p_name: o.name, p_email: low(o.email), p_hash: h, p_salt: salt, p_app: cfg.app, p_plan: o.plan || '', p_billing: o.billing || 'monthly' });
     var blocked = await gate(id, o.email);
     return { companyId: id, passwordHash: h, passwordSalt: salt, blocked: blocked };
@@ -166,7 +189,7 @@ function hpContact(e){
   /* teammates added inside an app (CRM Users & Roles). The app's own role is kept per app; Books sees admin/user */
   var booksRole = function (r) { return /^admin/i.test(String(r || '')) ? 'admin' : 'user'; };
   async function addUser(o) {
-    var salt = newSalt(), h = await hash(o.password, salt);
+    var salt = o.passwordSalt || newSalt(), h = o.passwordHash || await hash(o.password, salt);
     await rpc('acx_add_user', { p_company: o.companyId, p_name: o.name, p_email: low(o.email), p_role: booksRole(o.role), p_hash: h, p_salt: salt, p_app: cfg.app, p_app_role: o.role || '' });
     return { passwordHash: h, passwordSalt: salt };
   }
@@ -178,26 +201,34 @@ function hpContact(e){
     try {
       var list = JSON.parse(localStorage.getItem(usersKey) || '[]');
       var rec = { companyId: u.companyId, company: u.company, name: u.name, email: low(u.email), role: u.role, passwordHash: u.passwordHash, passwordSalt: u.passwordSalt };
+      Object.keys(rec).forEach(function (k) { if (rec[k] === undefined) delete rec[k]; });
       var i = list.findIndex(function (x) { return low(x.email) === rec.email && x.companyId === rec.companyId; });
       if (i > -1) { list[i] = Object.assign({}, list[i], rec); delete list[i].password; } else list.push(rec);
       rawSet.call(localStorage, usersKey, JSON.stringify(list));
     } catch (e) {}
   }
-  function verifyLocal(u, pass) { return verify(u, pass); }
+  async function verifyLocal(u, pass) {
+    if (!u) return false;
+    if (u.passwordHash && u.passwordSalt) return verify({ passwordHash: u.passwordHash, passwordSalt: u.passwordSalt }, pass);
+    /* old record from before this fix: accept the plaintext once, then replace it with a salted hash and wipe it */
+    if (typeof u.password === 'string' && u.password === pass) { var s = newSalt(); u.passwordHash = await hash(pass, s); u.passwordSalt = s; delete u.password; return true; }
+    return false;
+  }
+  async function sealLocal(pass) { var s = newSalt(); return { passwordHash: await hash(pass, s), passwordSalt: s }; }
 
   /* accounts that only ever existed in this browser get a cloud company; their data and teammates move with them.
      'all' is the local users array: it is updated in place (caller saves it). Returns the signed-in user's new record. */
   async function migrate(u, pass, all) {
     var oldId = u.companyId, same = (all || [u]).filter(function (x) { return x.companyId === oldId; });
-    var owner = same.find(function (x) { return /^admin/i.test(String(x.role || 'Administrator')) && x.password; }) || u;
+    var owner = same.find(function (x) { return /^admin/i.test(String(x.role || 'Administrator')) && (x.password || x.passwordHash); }) || u;
     var ownerPass = owner === u ? pass : owner.password;
-    var r = await register({ company: owner.company, name: owner.name, email: owner.email, password: ownerPass });
+    var r = await register({ company: owner.company, name: owner.name, email: owner.email, password: ownerPass, passwordHash: owner.passwordHash, passwordSalt: owner.passwordSalt });
     for (var i = 0; i < same.length; i++) {
       var x = same[i];
       if (x === owner) { x.passwordHash = r.passwordHash; x.passwordSalt = r.passwordSalt; }
       else {
         var pw = x === u ? pass : x.password;
-        if (pw) { try { var h = await addUser({ companyId: r.companyId, name: x.name, email: x.email, password: pw, role: x.role || 'Administrator' }); x.passwordHash = h.passwordHash; x.passwordSalt = h.passwordSalt; } catch (e) { continue; } }
+        if (pw || x.passwordHash) { try { var h = await addUser({ companyId: r.companyId, name: x.name, email: x.email, password: pw, passwordHash: x.passwordHash, passwordSalt: x.passwordSalt, role: x.role || 'Administrator' }); x.passwordHash = h.passwordHash; x.passwordSalt = h.passwordSalt; } catch (e) { continue; } }
         else continue;
       }
       delete x.password; x.companyId = r.companyId;
@@ -453,7 +484,7 @@ function hpContact(e){
   };
   setTimeout(function () { try { if (w.acxPlanChanged) w.acxPlanChanged(); } catch (e) {} }, 0);
 
-  w.AcaciaCloud = { onRemote: onRemote, sync: syncNow, init: init, signIn: signIn, register: register, addUser: addUser, setRole: setRole, removeUser: removeUser, cacheUser: cacheUser, verifyLocal: verifyLocal, migrate: migrate, start: start, stop: stop, flush: flush, isCloudId: isCloudId, gate: gate, URL: URL_, KEY: KEY_, rpc: rpc, req: req };
+  w.AcaciaCloud = { onRemote: onRemote, sync: syncNow, init: init, signIn: signIn, register: register, addUser: addUser, setRole: setRole, removeUser: removeUser, cacheUser: cacheUser, verifyLocal: verifyLocal, sealLocal: sealLocal, migrate: migrate, start: start, stop: stop, flush: flush, isCloudId: isCloudId, gate: gate, URL: URL_, KEY: KEY_, rpc: rpc, req: req };
 })(window);
 ;
 /* =========================================================
@@ -554,7 +585,7 @@ async function handleRegister(){
     if(e.code === 'exists'){ showAuthError('registerError','This company already has an account with that email. Please sign in instead.'); return; }
     if(e.code !== 'offline'){ showAuthError('registerError', e.message || 'Could not create the account. Please try again.'); return; }
     if(users.some(u=>u.email===email)){ showAuthError('registerError','An account with that email already exists.'); return; }
-    user = {companyId:uid('co'), company, name, email, password, role:'Administrator'};   // offline: uploaded the next time you sign in online
+    user = Object.assign({companyId:uid('co'), company, name, email, role:'Administrator'}, await AcaciaCloud.sealLocal(password));   // offline: uploaded the next time you sign in online
   }
   if(viaCloud) AcaciaCloud.cacheUser(USERS_KEY, user); else { users.push(user); saveUsers(users); }
   setSession(user);
@@ -576,6 +607,7 @@ async function handleLogin(){
     const users = getUsers();
     for(const u of users){ if(u.email === email && String(u.company||'').trim().toLowerCase() === company.toLowerCase() && await AcaciaCloud.verifyLocal(u, password)){ user = u; break; } }
     if(!user){ showAuthError('loginError','That email and password combination was not found.'); return; }
+    saveUsers(users);   /* keeps the plaintext-to-hash upgrade */
     if(!AcaciaCloud.isCloudId(user.companyId)){
       try{ const moved = await AcaciaCloud.migrate(user, password, users); if(moved){ saveUsers(users); user = moved; } }catch(e){ /* offline: stays on this device for now */ }
     }
@@ -680,7 +712,7 @@ function renderNav(){
     sec.items.forEach(it=>{
       const d = document.createElement("div");
       d.className = "navitem" + (currentView===it.id ? " active":"");
-      d.innerHTML = `<span class="dot"></span>${it.label}`;
+      d.innerHTML = `<span class="dot"></span>${esc(it.label)}`;
       d.onclick = ()=>{ goTo(it.id); if(window.innerWidth<=840) document.getElementById("sidebar").classList.remove("open"); };
       g.appendChild(d);
     });
@@ -784,7 +816,7 @@ function renderDashboard(c){
           <div class="funnel">
             ${funnelData.map(f=>`
               <div class="funnel-row">
-                <div class="funnel-label">${f.label}</div>
+                <div class="funnel-label">${esc(f.label)}</div>
                 <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:${Math.max(6,f.value/maxFunnel*100)}%"></div></div>
                 <div class="funnel-num">${f.value}</div>
               </div>`).join("")}
@@ -804,19 +836,19 @@ function renderDashboard(c){
         <div class="panel">
           <h3>Today &amp; overdue tasks <span class="count">(${DB.activities.filter(a=>!a.done).length} open)</span></h3>
           ${listOrEmpty(DB.activities.filter(a=>!a.done).sort((a,b)=>a.due.localeCompare(b.due)).slice(0,6).map(a=>`
-            <div class="listrow"><div class="main"><div class="title">${a.title}</div><div class="meta">${a.kind} · Due ${fmtDate(a.due)} · ${a.owner}</div></div></div>
+            <div class="listrow"><div class="main"><div class="title">${esc(a.title)}</div><div class="meta">${a.kind} · Due ${fmtDate(a.due)} · ${esc(a.owner)}</div></div></div>
           `), "No open tasks — nice work.")}
         </div>
         <div class="panel">
           <h3>Recent leads</h3>
           ${listOrEmpty([...DB.leads].sort((a,b)=>b.created.localeCompare(a.created)).slice(0,5).map(l=>`
-            <div class="listrow"><div class="main"><div class="title">${l.name} — ${l.company}</div><div class="meta">${l.source} · <span class="pill status-${l.status}">${l.status}</span></div></div></div>
+            <div class="listrow"><div class="main"><div class="title">${esc(l.name)} — ${esc(l.company)}</div><div class="meta">${esc(l.source)} · <span class="pill status-${esc(l.status)}">${esc(l.status)}</span></div></div></div>
           `), "No leads yet.")}
         </div>
         <div class="panel">
           <h3>Deals closing soon</h3>
           ${listOrEmpty([...DB.deals].filter(d=>!d.stage.startsWith("Closed")).sort((a,b)=>a.closing.localeCompare(b.closing)).slice(0,5).map(d=>`
-            <div class="listrow"><div class="main"><div class="title">${d.name}</div><div class="meta">${fmtMoney(d.amount)} · ${fmtDate(d.closing)} · ${d.stage}</div></div></div>
+            <div class="listrow"><div class="main"><div class="title">${esc(d.name)}</div><div class="meta">${fmtMoney(d.amount)} · ${fmtDate(d.closing)} · ${esc(d.stage)}</div></div></div>
           `), "No open deals.")}
         </div>
       </div>
@@ -824,7 +856,7 @@ function renderDashboard(c){
   `;
 }
 function kpi(label,value,delta){
-  return `<div class="kpi"><div class="label">${label}</div><div class="value">${value}</div>${delta?`<div class="delta ${delta.dir}">${delta.text}</div>`:""}</div>`;
+  return `<div class="kpi"><div class="label">${label}</div><div class="value">${value}</div>${delta?`<div class="delta ${delta.dir}">${esc(delta.text)}</div>`:""}</div>`;
 }
 function listOrEmpty(rows,emptyText){
   return rows.length ? rows.join("") : `<div class="empty">${emptyText}</div>`;
@@ -860,12 +892,12 @@ function renderLeads(c){
         <tbody>
         ${rows.length ? rows.map(l=>`
           <tr onclick="goTo('lead-detail',{type:'lead',id:'${l.id}'})">
-            <td><span class="rowlink">${l.name}</span></td>
-            <td>${l.company}</td>
-            <td>${l.source}</td>
-            <td><span class="pill status-${l.status.replace(/ /g,'')}">${l.status}</span></td>
+            <td><span class="rowlink">${esc(l.name)}</span></td>
+            <td>${esc(l.company)}</td>
+            <td>${esc(l.source)}</td>
+            <td><span class="pill status-${l.status.replace(/ /g,'')}">${esc(l.status)}</span></td>
             <td><span class="pill score-${scoreLabel(l.score)}">${l.score} · ${scoreLabelText(l.score)}</span></td>
-            <td>${l.owner}</td>
+            <td>${esc(l.owner)}</td>
             <td>${l.nextFollowup?fmtDate(l.nextFollowup):"—"}</td>
             <td class="acx-cell" onclick="event.stopPropagation()">${crmAct('leads',{view:`goTo('lead-detail',{type:'lead',id:'${l.id}'})`, edit:`openLeadForm('${l.id}')`, clone:`cloneLead('${l.id}')`, del:`deleteLead('${l.id}')`})}</td>
           </tr>
@@ -884,8 +916,8 @@ function renderLeadDetail(c){
     <div class="detail-header">
       <div class="top">
         <div>
-          <h2>${l.name}</h2>
-          <div class="sub2">${l.title||""} at ${l.company} · <span class="pill status-${l.status.replace(/ /g,'')}">${l.status}</span> <span class="pill score-${scoreLabel(l.score)}">${scoreLabelText(l.score)} (${l.score})</span></div>
+          <h2>${esc(l.name)}</h2>
+          <div class="sub2">${esc(l.title||"")} at ${esc(l.company)} · <span class="pill status-${l.status.replace(/ /g,'')}">${esc(l.status)}</span> <span class="pill score-${scoreLabel(l.score)}">${scoreLabelText(l.score)} (${l.score})</span></div>
         </div>
         <div class="actions">
           <button class="btn btn-sm" onclick="openLeadForm('${l.id}')">Edit</button>
@@ -893,13 +925,13 @@ function renderLeadDetail(c){
         </div>
       </div>
       <div class="fieldsgrid">
-        <div><div class="k">Email</div><div class="v">${l.email||"—"}</div></div>
-        <div><div class="k">Phone</div><div class="v">${l.phone||"—"}</div></div>
+        <div><div class="k">Email</div><div class="v">${esc(l.email||"—")}</div></div>
+        <div><div class="k">Phone</div><div class="v">${esc(l.phone||"—")}</div></div>
         <div><div class="k">Mobile</div><div class="v">${l.mobile||"—"}</div></div>
         <div><div class="k">Industry</div><div class="v">${l.industry||"—"}</div></div>
         <div><div class="k">Country / County</div><div class="v">${l.country||"—"} ${l.county?"/ "+l.county:""}</div></div>
-        <div><div class="k">Lead Source</div><div class="v">${l.source}</div></div>
-        <div><div class="k">Lead Owner</div><div class="v">${l.owner}</div></div>
+        <div><div class="k">Lead Source</div><div class="v">${esc(l.source)}</div></div>
+        <div><div class="k">Lead Owner</div><div class="v">${esc(l.owner)}</div></div>
         <div><div class="k">Expected Revenue</div><div class="v">${fmtMoney(l.revenue)}</div></div>
         <div><div class="k">Created</div><div class="v">${fmtDate(l.created)}</div></div>
         <div><div class="k">Last Contacted</div><div class="v">${l.lastContacted?fmtDate(l.lastContacted):"—"}</div></div>
@@ -949,10 +981,10 @@ function convertLead(id){
   const l = findLead(id);
   if(!l) return;
   openModal("Convert Lead", `
-    <p style="margin-top:0;font-size:13.5px;color:var(--ink-soft);">Converting <strong>${l.name}</strong> will create an Account, a Contact, and a Deal — then mark the lead as Converted.</p>
+    <p style="margin-top:0;font-size:13.5px;color:var(--ink-soft);">Converting <strong>${esc(l.name)}</strong> will create an Account, a Contact, and a Deal — then mark the lead as Converted.</p>
     <div class="formgrid">
-      <div class="field full"><label>Account name</label><input id="cv_account" value="${l.company}"></div>
-      <div class="field full"><label>Deal name</label><input id="cv_deal" value="${l.company} — Initial Deal"></div>
+      <div class="field full"><label>Account name</label><input id="cv_account" value="${esc(l.company)}"></div>
+      <div class="field full"><label>Deal name</label><input id="cv_deal" value="${esc(l.company)} — Initial Deal"></div>
       <div class="field"><label>Deal amount (KSh)</label><input id="cv_amount" type="number" value="${l.revenue}"></div>
       <div class="field"><label>Deal stage</label><select id="cv_stage">${["Qualification","Needs Analysis","Proposal","Negotiation"].map(s=>`<option>${s}</option>`).join("")}</select></div>
     </div>
@@ -1022,13 +1054,13 @@ function renderAccounts(c){
         <tbody>
         ${rows.map(a=>`
           <tr onclick="goTo('account-detail',{type:'account',id:'${a.id}'})">
-            <td><span class="rowlink">${a.name}</span></td>
+            <td><span class="rowlink">${esc(a.name)}</span></td>
             <td>${a.industry||"—"}</td>
-            <td>${a.owner}</td>
+            <td>${esc(a.owner)}</td>
             <td>${a.type}</td>
             <td>${accountContacts(a.id).length}</td>
             <td>${accountDeals(a.id).filter(d=>!d.stage.startsWith("Closed")).length}</td>
-            <td><span class="pill status-Qualified">${a.status}</span></td>
+            <td><span class="pill status-Qualified">${esc(a.status)}</span></td>
             <td class="acx-cell">${crmAct('accounts',{view:`goTo('account-detail',{type:'account',id:'${a.id}'})`, edit:`openAccountForm('${a.id}')`, clone:`cloneAccount('${a.id}')`, del:`deleteAccount('${a.id}')`})}</td>
           </tr>
         `).join("")}
@@ -1050,7 +1082,7 @@ function renderAccountDetail(c){
     <div class="backlink" onclick="goTo('accounts')">← Back to Accounts</div>
     <div class="detail-header">
       <div class="top">
-        <div><h2>${a.name}</h2><div class="sub2">${a.industry||"—"} · ${a.country||""} · Owner: ${a.owner}</div></div>
+        <div><h2>${esc(a.name)}</h2><div class="sub2">${a.industry||"—"} · ${a.country||""} · Owner: ${esc(a.owner)}</div></div>
         <div class="actions">${canManage('accounts') ? `<button class="btn btn-sm" onclick="openAccountForm('${a.id}')">Edit</button>` : ``}</div>
       </div>
     </div>
@@ -1060,29 +1092,29 @@ function renderAccountDetail(c){
   const body = document.getElementById("accTabBody");
   if(accountDetailTab==="overview"){
     body.innerHTML = `<div class="panel"><h3>Account profile</h3><div class="fieldsgrid">
-      <div><div class="k">Website</div><div class="v">${a.website||"—"}</div></div>
-      <div><div class="k">Phone</div><div class="v">${a.phone||"—"}</div></div>
-      <div><div class="k">Email</div><div class="v">${a.email||"—"}</div></div>
-      <div><div class="k">Address</div><div class="v">${a.address||"—"}</div></div>
+      <div><div class="k">Website</div><div class="v">${esc(a.website||"—")}</div></div>
+      <div><div class="k">Phone</div><div class="v">${esc(a.phone||"—")}</div></div>
+      <div><div class="k">Email</div><div class="v">${esc(a.email||"—")}</div></div>
+      <div><div class="k">Address</div><div class="v">${esc(a.address||"—")}</div></div>
       <div><div class="k">Employees</div><div class="v">${a.employees||"—"}</div></div>
       <div><div class="k">Annual Revenue</div><div class="v">${fmtMoney(a.revenue)}</div></div>
       <div><div class="k">Account Type</div><div class="v">${a.type}</div></div>
-      <div><div class="k">Status</div><div class="v">${a.status}</div></div>
+      <div><div class="k">Status</div><div class="v">${esc(a.status)}</div></div>
       <div><div class="k">Created</div><div class="v">${fmtDate(a.created)}</div></div>
     </div></div>`;
   } else if(accountDetailTab==="contacts"){
     body.innerHTML = `<div class="panel"><h3>Contacts <span class="count">(${conts.length})</span></h3>
-      ${listOrEmpty(conts.map(ct=>`<div class="listrow"><div class="avatarsm">${initials(ct.first+' '+ct.last)}</div><div class="main"><div class="title">${ct.first} ${ct.last} — ${ct.title}</div><div class="meta">${ct.email} · ${ct.phone}</div></div></div>`),"No contacts linked yet.")}
+      ${listOrEmpty(conts.map(ct=>`<div class="listrow"><div class="avatarsm">${initials(ct.first+' '+ct.last)}</div><div class="main"><div class="title">${ct.first} ${ct.last} — ${esc(ct.title)}</div><div class="meta">${esc(ct.email)} · ${esc(ct.phone)}</div></div></div>`),"No contacts linked yet.")}
     </div>`;
   } else if(accountDetailTab==="deals"){
     body.innerHTML = `<div class="panel"><h3>Deals <span class="count">(${dls.length})</span></h3>
-      ${listOrEmpty(dls.map(d=>`<div class="listrow" style="cursor:pointer" onclick="goTo('deal-detail',{type:'deal',id:'${d.id}'})"><div class="main"><div class="title rowlink">${d.name}</div><div class="meta">${fmtMoney(d.amount)} · ${d.stage}</div></div></div>`),"No deals yet.")}
+      ${listOrEmpty(dls.map(d=>`<div class="listrow" style="cursor:pointer" onclick="goTo('deal-detail',{type:'deal',id:'${d.id}'})"><div class="main"><div class="title rowlink">${esc(d.name)}</div><div class="meta">${fmtMoney(d.amount)} · ${esc(d.stage)}</div></div></div>`),"No deals yet.")}
     </div>`;
   } else if(accountDetailTab==="activities"){
     body.innerHTML = `<div class="panel"><h3>Activities</h3>${renderRelatedActivities(a.id)}</div>`;
   } else if(accountDetailTab==="timeline"){
     body.innerHTML = `<div class="panel"><h3>Customer timeline</h3><div class="timeline">
-      ${tls.length? tls.map(t=>`<div class="tl-item"><div class="tl-date">${fmtDate(t.date)}</div><div class="tl-text">${t.text}</div></div>`).join("") : `<div class="empty">No timeline events yet.</div>`}
+      ${tls.length? tls.map(t=>`<div class="tl-item"><div class="tl-date">${fmtDate(t.date)}</div><div class="tl-text">${esc(t.text)}</div></div>`).join("") : `<div class="empty">No timeline events yet.</div>`}
     </div></div>`;
   }
 }
@@ -1127,11 +1159,11 @@ function renderContacts(c){
         const acc = findAccount(ct.account);
         return `<tr onclick="${acc?`goTo('account-detail',{type:'account',id:'${acc.id}'})`:''}">
           <td><div style="display:flex;align-items:center;gap:8px;"><div class="avatarsm">${initials(ct.first+' '+ct.last)}</div>${ct.first} ${ct.last}</div></td>
-          <td>${ct.title||"—"}</td>
-          <td>${acc?`<span class="rowlink">${acc.name}</span>`:"—"}</td>
-          <td>${ct.email||"—"}</td>
-          <td>${ct.phone||"—"}</td>
-          <td>${ct.owner||"—"}</td>
+          <td>${esc(ct.title||"—")}</td>
+          <td>${acc?`<span class="rowlink">${esc(acc.name)}</span>`:"—"}</td>
+          <td>${esc(ct.email||"—")}</td>
+          <td>${esc(ct.phone||"—")}</td>
+          <td>${esc(ct.owner||"—")}</td>
           <td class="acx-cell">${crmAct('contacts',{view:`previewContact('${ct.id}')`, edit:`openContactForm('${ct.id}')`, clone:`cloneContact('${ct.id}')`, del:`deleteContact('${ct.id}')`})}</td>
         </tr>`;
       }).join("")}
@@ -1146,7 +1178,7 @@ function openContactForm(id){
     <div class="field"><label>First name</label><input id="f_first" value="${v('first')}"></div>
     <div class="field"><label>Last name</label><input id="f_last" value="${v('last')}"></div>
     <div class="field"><label>Title</label><input id="f_title" value="${v('title')}"></div>
-    <div class="field"><label>Account</label><select id="f_account"><option value="">— None —</option>${DB.accounts.map(a=>`<option value="${a.id}" ${ct&&ct.account===a.id?"selected":""}>${a.name}</option>`).join("")}</select></div>
+    <div class="field"><label>Account</label><select id="f_account"><option value="">— None —</option>${DB.accounts.map(a=>`<option value="${a.id}" ${ct&&ct.account===a.id?"selected":""}>${esc(a.name)}</option>`).join("")}</select></div>
     <div class="field"><label>Email</label><input id="f_email" value="${v('email')}"></div>
     <div class="field"><label>Phone</label><input id="f_phone" value="${v('phone')}"></div>
     <div class="field"><label>Department</label><input id="f_department" value="${v('department')}"></div>
@@ -1178,13 +1210,13 @@ function renderDealsList(c){
       ${rows.map(d=>{
         const acc = findAccount(d.account);
         return `<tr onclick="goTo('deal-detail',{type:'deal',id:'${d.id}'})">
-          <td><span class="rowlink">${d.name}</span></td>
+          <td><span class="rowlink">${esc(d.name)}</span></td>
           <td>${acc?acc.name:"—"}</td>
           <td>${fmtMoney(d.amount)}</td>
-          <td><span class="pill status-Qualified">${d.stage}</span></td>
+          <td><span class="pill status-Qualified">${esc(d.stage)}</span></td>
           <td>${d.probability}%</td>
           <td>${d.closing?fmtDate(d.closing):"—"}</td>
-          <td>${d.owner}</td>
+          <td>${esc(d.owner)}</td>
         </tr>`;
       }).join("")}
       </tbody>
@@ -1201,7 +1233,7 @@ function renderDealDetail(c){
     <div class="backlink" onclick="goTo('deals')">← Back to Deals</div>
     <div class="detail-header">
       <div class="top">
-        <div><h2>${d.name}</h2><div class="sub2">${fmtMoney(d.amount)} · <span class="pill status-Qualified">${d.stage}</span> · ${d.probability}% probability</div></div>
+        <div><h2>${esc(d.name)}</h2><div class="sub2">${fmtMoney(d.amount)} · <span class="pill status-Qualified">${esc(d.stage)}</span> · ${d.probability}% probability</div></div>
         <div class="actions">
           <select onchange="updateDealStage('${d.id}',this.value)" class="btn btn-sm" style="border:1px solid var(--line)" ${canManage('deals')?'':'disabled'}>
             ${PIPELINE_STAGES.map(s=>`<option ${s===d.stage?"selected":""}>${s}</option>`).join("")}
@@ -1210,17 +1242,17 @@ function renderDealDetail(c){
         </div>
       </div>
       <div class="fieldsgrid">
-        <div><div class="k">Account</div><div class="v">${acc?`<span class="rowlink" onclick="goTo('account-detail',{type:'account',id:'${acc.id}'})">${acc.name}</span>`:"—"}</div></div>
+        <div><div class="k">Account</div><div class="v">${acc?`<span class="rowlink" onclick="goTo('account-detail',{type:'account',id:'${acc.id}'})">${esc(acc.name)}</span>`:"—"}</div></div>
         <div><div class="k">Contact</div><div class="v">${cont?cont.first+' '+cont.last:"—"}</div></div>
-        <div><div class="k">Owner</div><div class="v">${d.owner}</div></div>
+        <div><div class="k">Owner</div><div class="v">${esc(d.owner)}</div></div>
         <div><div class="k">Closing Date</div><div class="v">${d.closing?fmtDate(d.closing):"—"}</div></div>
         <div><div class="k">Deal Type</div><div class="v">${d.type}</div></div>
-        <div><div class="k">Lead Source</div><div class="v">${d.source}</div></div>
+        <div><div class="k">Lead Source</div><div class="v">${esc(d.source)}</div></div>
         <div><div class="k">Competitor</div><div class="v">${d.competitor||"—"}</div></div>
         <div><div class="k">Next Step</div><div class="v">${d.nextStep||"—"}</div></div>
         <div><div class="k">Created</div><div class="v">${fmtDate(d.created)}</div></div>
       </div>
-      ${d.description?`<div style="margin-top:12px;font-size:13px;color:var(--ink-soft)">${d.description}</div>`:""}
+      ${d.description?`<div style="margin-top:12px;font-size:13px;color:var(--ink-soft)">${esc(d.description)}</div>`:""}
     </div>
     <div class="panel"><h3>Activities</h3>${renderRelatedActivities(d.id)}</div>
   `;
@@ -1247,7 +1279,7 @@ function openDealForm(id){
   const d = id?findDeal(id):null;
   const body = `<div class="formgrid">
     <div class="field full"><label>Deal name</label><input id="f_name" value="${d?d.name:''}"></div>
-    <div class="field"><label>Account</label><select id="f_account"><option value="">— None —</option>${DB.accounts.map(a=>`<option value="${a.id}" ${d&&d.account===a.id?"selected":""}>${a.name}</option>`).join("")}</select></div>
+    <div class="field"><label>Account</label><select id="f_account"><option value="">— None —</option>${DB.accounts.map(a=>`<option value="${a.id}" ${d&&d.account===a.id?"selected":""}>${esc(a.name)}</option>`).join("")}</select></div>
     <div class="field"><label>Contact</label><select id="f_contact"><option value="">— None —</option>${DB.contacts.map(ct=>`<option value="${ct.id}" ${d&&d.contact===ct.id?"selected":""}>${ct.first} ${ct.last}</option>`).join("")}</select></div>
     <div class="field"><label>Amount (KSh)</label><input id="f_amount" type="number" value="${d?d.amount:0}"></div>
     <div class="field"><label>Probability (%)</label><input id="f_prob" type="number" min="0" max="100" value="${d?d.probability:20}"></div>
@@ -1287,7 +1319,7 @@ function renderPipeline(c){
           <div class="kanban-col-body">
             ${items.map(d=>`
               <div class="kcard" draggable="true" ondragstart="dragDealId='${d.id}';this.classList.add('dragging')" ondragend="this.classList.remove('dragging')" onclick="goTo('deal-detail',{type:'deal',id:'${d.id}'})">
-                <div class="kname">${d.name}</div>
+                <div class="kname">${esc(d.name)}</div>
                 <div class="kamount">${fmtMoney(d.amount)}</div>
                 <div class="kmeta">${findAccount(d.account)?findAccount(d.account).name:"No account"} · ${d.probability}%</div>
                 <div style="margin-top:4px;margin-left:-6px">${crmAct('deals',{view:`goTo('deal-detail',{type:'deal',id:'${d.id}'})`, edit:`openDealForm('${d.id}')`, clone:`cloneDeal('${d.id}')`, del:`deleteDeal('${d.id}')`})}</div>
@@ -1322,7 +1354,7 @@ function renderForecast(c){
       <thead><tr><th>Deal</th><th>Amount</th><th>Probability</th><th>Expected</th><th>Closing</th></tr></thead>
       <tbody>
       ${open.map(d=>`<tr onclick="goTo('deal-detail',{type:'deal',id:'${d.id}'})">
-        <td><span class="rowlink">${d.name}</span></td><td>${fmtMoney(d.amount)}</td><td>${d.probability}%</td>
+        <td><span class="rowlink">${esc(d.name)}</span></td><td>${fmtMoney(d.amount)}</td><td>${d.probability}%</td>
         <td>${fmtMoney(Math.round(d.amount*d.probability/100))}</td><td>${d.closing?fmtDate(d.closing):"—"}</td>
       </tr>`).join("")}
       <tr style="font-weight:700;background:var(--paper-2);"><td colspan="3">Total forecast</td><td>${fmtMoney(Math.round(total))}</td><td></td></tr>
@@ -1345,7 +1377,7 @@ function renderActivities(kind, c){
         const overdue = !a.done && a.due < todayISO();
         return `<div class="checklist-item ${a.done?'done':''}">
           <input type="checkbox" ${a.done?'checked':''} onchange="toggleActivity('${a.id}')" ${canManage('activities')?'':'disabled'}>
-          <div class="cltext">${a.title} <span style="color:var(--ink-soft);font-size:11.5px;">(${a.owner})</span></div>
+          <div class="cltext">${esc(a.title)} <span style="color:var(--ink-soft);font-size:11.5px;">(${esc(a.owner)})</span></div>
           <span class="cltag ${overdue?'overdue':''}">${overdue?'Overdue · ':''}${fmtDate(a.due)}</span>
           ${crmAct('activities',{edit:`openActivityForm('${kind}','${a.id}')`, clone:`cloneActivity('${a.id}')`, del:`deleteActivity('${a.id}')`})}
         </div>`;
@@ -1461,7 +1493,7 @@ function renderRelatedActivities(relatedId){
   return listOrEmpty(items.map(a=>`
     <div class="checklist-item ${a.done?'done':''}">
       <input type="checkbox" ${a.done?'checked':''} onchange="toggleActivity('${a.id}')">
-      <div class="cltext">${a.title}</div>
+      <div class="cltext">${esc(a.title)}</div>
       <span class="cltag ${(!a.done && a.due<todayISO())?'overdue':''}">${fmtDate(a.due)}</span>
     </div>
   `), "No linked activities yet.");
@@ -1480,7 +1512,7 @@ function renderCalendar(c){
   for(let d=1; d<=daysInMonth; d++){
     const iso = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const items = DB.activities.filter(a=>a.due===iso);
-    cells += `<div class="cal-cell"><div class="cal-daynum">${d}</div>${items.map(a=>`<div class="cal-item ${a.done?'done':''}" title="${a.title}">${a.title}</div>`).join("")}</div>`;
+    cells += `<div class="cal-cell"><div class="cal-daynum">${d}</div>${items.map(a=>`<div class="cal-item ${a.done?'done':''}" title="${esc(a.title)}">${esc(a.title)}</div>`).join("")}</div>`;
   }
   c.innerHTML = `
     <div class="pageheader">
@@ -1619,7 +1651,7 @@ function renderNotifBadge(){
 }
 function renderNotifPanel(){
   const panel = document.getElementById("notifPanel");
-  panel.innerHTML = DB.notifications.length ? DB.notifications.slice(0,12).map(n=>`<div class="notif-item">${n.text}<div class="t">${n.time}</div></div>`).join("") : `<div class="notif-item">No notifications.</div>`;
+  panel.innerHTML = DB.notifications.length ? DB.notifications.slice(0,12).map(n=>`<div class="notif-item">${esc(n.text)}<div class="t">${n.time}</div></div>`).join("") : `<div class="notif-item">No notifications.</div>`;
 }
 
 /* ---------- Global search ---------- */
@@ -2121,7 +2153,7 @@ function editTarget(){
 /* =========================================================
    CSV / JSON IMPORT-EXPORT
    ========================================================= */
-function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
 function csvCell(v){
   const s = v==null ? "" : (typeof v === "object" ? JSON.stringify(v) : String(v));
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
@@ -2322,7 +2354,7 @@ function buildPalette(q){
   }
   palResults = out; palIndex = 0;
   const list = document.getElementById("paletteList");
-  list.innerHTML = out.length ? out.map((r,i)=>`<div class="pal-item ${i===0?"sel":""}" data-i="${i}"><span class="tag">${r.tag}</span><span>${esc(r.label)}</span></div>`).join("")
+  list.innerHTML = out.length ? out.map((r,i)=>`<div class="pal-item ${i===0?"sel":""}" data-i="${i}"><span class="tag">${esc(r.tag)}</span><span>${esc(r.label)}</span></div>`).join("")
     : `<div class="pal-item"><span>No matches</span></div>`;
   list.querySelectorAll(".pal-item[data-i]").forEach(el=>{
     el.onclick = ()=>{ closePalette(); palResults[Number(el.dataset.i)].go(); };
@@ -2452,7 +2484,7 @@ function renderNav(){
     visible.forEach(it=>{
       const d = document.createElement("div");
       d.className = "navitem" + (currentView===it.id ? " active":"");
-      d.innerHTML = `<span class="dot"></span>${it.label}`;
+      d.innerHTML = `<span class="dot"></span>${esc(it.label)}`;
       d.onclick = ()=>{ goTo(it.id); if(window.innerWidth<=840) document.getElementById("sidebar").classList.remove("open"); };
       g.appendChild(d);
     });
@@ -2561,8 +2593,10 @@ function openUserForm(){
     if(password.length < 6){ toast("Password must be at least 6 characters."); return false; }
     const users = getUsers();
     if(users.some(u=>u.email===email)){ toast("That email is already in use."); return false; }
-    users.push({companyId: CURRENT_USER.companyId, company: CURRENT_USER.company, name, email, password, role});
-    saveUsers(users);
+    AcaciaCloud.sealLocal(password).then(seal=>{
+      const us0 = getUsers();
+      if(!us0.some(u=>u.email===email)){ us0.push(Object.assign({companyId: CURRENT_USER.companyId, company: CURRENT_USER.company, name, email, role}, seal)); saveUsers(us0); }
+    });
     if(AcaciaCloud.isCloudId(CURRENT_USER.companyId)){
       AcaciaCloud.addUser({companyId: CURRENT_USER.companyId, name, email, password, role}).then(h=>{
         const us = getUsers(); const x = us.find(z=>z.email===email && z.companyId===CURRENT_USER.companyId);

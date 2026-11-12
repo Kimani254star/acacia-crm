@@ -180,6 +180,14 @@
       try { res = await w.AcaciaCloud.rpc('acx_crm_books_read', { p_company: u.companyId, p_keys: KEYS.concat(['orgInfo_' + u.companyId]), p_known: force === true ? {} : KNOWN }); }
       catch (e) { if (e && (e.status === 404 || e.code === 'missing')) { res = await w.AcaciaCloud.rpc('acx_books_read', { p_company: u.companyId, p_keys: KEYS }); } else throw e; }
       var got = 0; (res || []).forEach(function (r) { RAW[r.key] = r; KNOWN[r.key] = r.updated_at; got++; });
+      /* stock: every warehouse row (inventory_<warehouse>) through acx_stock_read, joined into one list */
+      try {
+        var sr = await w.AcaciaCloud.rpc('acx_stock_read', { p_company: u.companyId });
+        if (Array.isArray(sr) && sr.length) {
+          var all = [], last = ''; sr.forEach(function (r) { var v = r.value; try { for (var i = 0; i < 3 && typeof v === 'string'; i++) v = JSON.parse(v); } catch (e) { return; } if (!Array.isArray(v)) return; var wh = r.key.indexOf('inventory_') === 0 ? r.key.slice(10) : ''; v.forEach(function (x) { if (x && typeof x === 'object') { if (!x.warehouse && wh) x.warehouse = wh; all.push(x); } }); if (String(r.updated_at) > last) last = String(r.updated_at); });
+          var sv = JSON.stringify(all); if (!RAW.inventory || RAW.inventory.value !== sv) { RAW.inventory = { key: 'inventory', value: sv, updated_at: last }; got++; }
+        }
+      } catch (e) { /* acacia_stock_sync.sql not run yet: keep what the plain read returned */ }
       if (got || !BK || force === true) {
         if (got) writeCache();
         BK = build();
